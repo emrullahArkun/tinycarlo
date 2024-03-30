@@ -6,11 +6,9 @@ from tinycarlo.helper import getenv
 
 import os, sys, time
 import numpy as np
-from tqdm import trange
 
 from examples.models.tinycar_net import TinycarCombo, TinycarEncoder, TinycarActorTemporal, TinycarActor
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
