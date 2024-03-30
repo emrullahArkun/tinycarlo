@@ -8,7 +8,7 @@ import os, sys, time
 import numpy as np
 from tqdm import trange
 
-from examples.models.tinycar_net import TinycarCombo, TinycarEncoder, TinycarComboTemporal
+from examples.models.tinycar_net import TinycarCombo, TinycarEncoder
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
