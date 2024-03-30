@@ -1,14 +1,14 @@
 import gymnasium as gym
-import tinycarlo
-#from tinygrad import Tensor, TinyJit, nn, Device, GlobalCounters
 from typing import Tuple
 from tinycarlo.wrapper import CTELinearRewardWrapper, LanelineSparseRewardWrapper, CTETerminationWrapper
+import tinycarlo
+from tinycarlo.helper import getenv
 
 import os, sys, time
 import numpy as np
 from tqdm import trange
 
-from examples.models.tinycar_net import TinycarCombo, TinycarEncoder
+from examples.models.tinycar_net import TinycarCombo, TinycarEncoder, TinycarActorTemporal, TinycarActor
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,6 +16,8 @@ import torch.nn.functional as F
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
 ENV_SEED = 1
+ACTOR = getenv("ACTOR") # if set, pretrained tinycombo is loaded and the provided actor swapped in
+TEMPORAL = getenv("TEMPORAL") # if set, actor is TinycarActorTemporal
 
 def pre_obs(obs: np.ndarray) -> np.ndarray:
     # cropping and normalizing the image
@@ -71,12 +73,18 @@ if __name__ == "__main__":
 
     obs = pre_obs(env.reset(seed=ENV_SEED)[0]) # seed the environment and get obs shape
 
-    tinycar_combo = TinycarComboTemporal(obs.shape)
+    tinycar_combo = TinycarCombo(obs.shape)
+    tinycar_combo.load_pretrained(device)
     if len(sys.argv) == 2:
-        tinycar_combo.load_state_dict(torch.load(sys.argv[1]))
+        if ACTOR:
+            actor = TinycarActorTemporal() if TEMPORAL else TinycarActor()
+            actor.load_state_dict(torch.load(sys.argv[1]), strict=False)
+            tinycar_combo.actor = actor
+        else:
+            tinycar_combo.load_state_dict(torch.load(sys.argv[1]), strict=False)
 
     for maneuver in range(3):
-        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, steps=2000, episodes=1, render_mode="human", temporal=5)
+        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, steps=500, episodes=10, render_mode="human", temporal=5 if TEMPORAL else 1)
         print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte:.4f} m/step | Heading Error: {heading_error:.4f} rad/step | Terminations: {terminations:3d} | perf: {stepss:.2f} steps/s")
     
 
