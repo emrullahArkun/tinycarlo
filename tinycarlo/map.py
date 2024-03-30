@@ -10,6 +10,7 @@ class Map():
         self.lanelines: List[Layer] = [] # list of Layers for the lanelines
         self.lanepath: Optional[Layer] = None # Layer for the lanepath
         self.dimension: Tuple[float,float] = (0,0) # dimension of the map (height, width) in meters
+        self.spawn_points: Optional[List[int]] = map_config.get("spawn_points", None)
 
         base_path = "./" if base_path is None else os.path.dirname(base_path)
         map_path: Any = os.path.join(base_path, map_config["json_path"])
@@ -56,7 +57,7 @@ class Map():
         Returns:
             Tuple[Node, float, Edge]: A tuple containing the spawn position, rotation, and edge information.
         """
-        random_node_idx: NodeIdx = np_random.integers(0, len(self.lanepath.nodes)-1, size=1, dtype=int)[0]
+        random_node_idx: NodeIdx = np_random.integers(0, len(self.lanepath.nodes)-1, size=1, dtype=int)[0] if self.spawn_points is None else np_random.choice(self.spawn_points)
         next_node = self.lanepath.get_next_nodes(random_node_idx)
         if len(next_node) == 0:
             return self.sample_spawn()

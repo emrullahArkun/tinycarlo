@@ -20,3 +20,4 @@ camera:
 map:
   json_path: ./maps/simple_layout.json # path to map file
   pixel_per_meter: 450
+  spawn_points: [65, 73, 202, 150, 195, 218, 116, 26, 20, 170, 131, 9] # list of spawn points/ node indices (use examples/render_map.py to visualize the map and get the node indices)
