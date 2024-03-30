@@ -8,7 +8,7 @@ model_urls: Dict[Tuple[int,int,int], str] = {
     (5,64,160): "http://riege.com.de/tinycarlo/tinycar_combo_5_64_160.pt",
 }
 
-DEFAULT_M_DIM = 4
+DEFAULT_M_DIM = 3
 DEFAULT_A_DIM = 1
 
 class ConvBlock(nn.Module):
@@ -48,34 +48,46 @@ class TinycarEncoder(nn.Module):
 class TinycarActor(nn.Module):
     def __init__(self, in_features: int = TinycarEncoder.FEATURE_VEC_SIZE, maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM):
         super(TinycarActor, self).__init__()
-        self.fcm = nn.Linear(maneuver_dim, in_features)
-        self.fc1 = nn.Linear(in_features, 100)
+        self.fcm1 = nn.Linear(maneuver_dim, 50)
+        self.fcm2 = nn.Linear(50, 100)
+        self.fcm3 = nn.Linear(100, in_features)
+        self.fc1 = nn.Linear(in_features*2, 100)
         self.fc2 = nn.Linear(100, 50)
         self.fc3 = nn.Linear(50, 10)
         self.fc4 = nn.Linear(10, action_dim)
 
     def forward(self, f: torch.tensor, m: torch.tensor) -> torch.tensor:
-        attention_weights = F.sigmoid(self.fcm(m))
-        out = f * attention_weights
+        m = F.relu(self.fcm1(m))
+        m = F.relu(self.fcm2(m))
+        m = F.relu(self.fcm3(m))
+        out = torch.cat([f, m], dim=1)
         out = F.relu(self.fc1(out))
         out = F.relu(self.fc2(out))
         out = F.relu(self.fc3(out))
         return F.tanh(self.fc4(out))
     
-class TinycarActorLSTM(nn.Module):
+class TinycarActorTemporal(nn.Module):
     def __init__(self, in_features: int = TinycarEncoder.FEATURE_VEC_SIZE, maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM):
-        super(TinycarActorLSTM, self).__init__()
-        self.lstm = nn.LSTM(in_features, in_features, 1, batch_first=True)
-        self.fcm = nn.Linear(maneuver_dim, in_features)
-        self.fc1 = nn.Linear(in_features, 100)
+        super(TinycarActorTemporal, self).__init__()
+        self.cnn1 =nn.Conv1d(5, 16, 3, padding=1)
+        self.cnn2 =nn.Conv1d(16, 16, 3, padding=2, dilation=2)
+        self.cnn3 =nn.Conv1d(16, 16, 3, padding=4, dilation=4)
+        self.fcm1 = nn.Linear(maneuver_dim, 50)
+        self.fcm2 = nn.Linear(50, 100)
+        self.fcm3 = nn.Linear(100, in_features)
+        self.fc1 = nn.Linear(in_features*2, 100)
         self.fc2 = nn.Linear(100, 50)
         self.fc3 = nn.Linear(50, 10)
         self.fc4 = nn.Linear(10, action_dim)
 
     def forward(self, f: torch.tensor, m: torch.tensor) -> torch.tensor:
-        attention_weights = F.sigmoid(self.fcm(m))
-        last_output = self.lstm(f)[0][:, -1, :]
-        out = last_output * attention_weights
+        f = F.relu(self.cnn1(f))
+        f = F.relu(self.cnn2(f))
+        f = F.relu(self.cnn3(f)).mean(dim=1)
+        m = F.relu(self.fcm1(m))
+        m = F.relu(self.fcm2(m))
+        m = F.relu(self.fcm3(m))
+        out = torch.cat([f, m], dim=1)
         out = F.relu(self.fc1(out))
         out = F.relu(self.fc2(out))
         out = F.relu(self.fc3(out))
@@ -103,17 +115,6 @@ class TinycarCombo(nn.Module):
         print(f"No pretrained weights found for image_dim: {self.image_dim}, maneuver_dim: {self.m_dim}, action_dim: {self.a_dim}")
         return False
 
-class TinycarComboLSTM(nn.Module):
-    def __init__(self, image_dim: Tuple[int, int, int], maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM):
-        super(TinycarComboLSTM, self).__init__()
-        self.image_dim, self.m_dim, self.a_dim = image_dim, maneuver_dim, action_dim
-        self.encoder = TinycarEncoder(image_dim)
-        self.actor = TinycarActorLSTM(maneuver_dim=maneuver_dim, action_dim=action_dim)
-
-    def forward(self, x: torch.tensor, m: torch.tensor) -> torch.tensor:
-        out = self.encoder(x)
-        return self.actor(out, m)
-
 class TinycarCritic(nn.Module):
     def __init__(self, maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM):
         super(TinycarCritic, self).__init__()
@@ -129,19 +130,23 @@ class TinycarCritic(nn.Module):
         out = F.relu(self.fc1(out))
         return self.fc2(out)
     
-class TinycarCriticLSTM(nn.Module):
+class TinycarCriticTemporal(nn.Module):
     def __init__(self, maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM):
-        super(TinycarCriticLSTM, self).__init__()
+        super(TinycarCriticTemporal, self).__init__()
         self.fca = nn.Linear(action_dim, TinycarEncoder.FEATURE_VEC_SIZE)
         self.fcm = nn.Linear(maneuver_dim, TinycarEncoder.FEATURE_VEC_SIZE)
-        self.lstm = nn.LSTM(TinycarEncoder.FEATURE_VEC_SIZE, TinycarEncoder.FEATURE_VEC_SIZE, 1, batch_first=True)
+        self.cnn1 =nn.Conv1d(5, 16, 3, padding=1)
+        self.cnn2 =nn.Conv1d(16, 16, 3, padding=2, dilation=2)
+        self.cnn3 =nn.Conv1d(16, 16, 3, padding=4, dilation=4)
         self.fc1 = nn.Linear(TinycarEncoder.FEATURE_VEC_SIZE*3, 512)
         self.fc2 = nn.Linear(512, 1)
     
     def forward(self, f: torch.tensor, m: torch.tensor, a: torch.tensor) -> torch.tensor:
         m = F.relu(self.fcm(m))
         a = F.relu(self.fca(a))
-        last_output = self.lstm(f)[0][:, -1, :]
-        out = torch.cat([last_output, m, a], dim=1)
+        f = F.relu(self.cnn1(f))
+        f = F.relu(self.cnn2(f))
+        f = F.relu(self.cnn3(f)).mean(dim=1)
+        out = torch.cat([f, m, a], dim=1)
         out = F.relu(self.fc1(out))
         return self.fc2(out)

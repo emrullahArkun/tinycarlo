@@ -17,7 +17,7 @@ from examples.benchmark_tinycar_net import pre_obs, evaluate
 
 LEARNING_RATE = 1e-4
 BATCH_SIZE = 16
-STEPS = 3000
+STEPS = 5000
 
 ### Data Collection
 STEP_SIZE = 2000 # number of steps to take per episode
@@ -64,7 +64,7 @@ def sample_episode(Xn, Mn, Yn, old_steps, env, maneuver = 0, seed = 0):
         steering_correction = math.atan2(K * cte, SPEED)
         steering_angle = (heading_error + steering_correction) * 180 / math.pi / env.unwrapped.config["car"]["max_steering_angle"]
         noise += NOISE_THETA * (NOISE_MEAN - noise) + NOISE_SIGMA * np.random.randn(action_dim) # Ornstein-Uhlenbeck process
-        action = {"car_control": [SPEED, steering_angle + noise[0]], "maneuver": maneuver}
+        action = {"car_control": [SPEED, steering_angle + noise[0]], "maneuver": maneuver if maneuver != 2 else 3}
         env.unwrapped.no_observation = False if (i+1)%5 == 0 else True
         next_obs, _, terminated, truncated, info = env.step(action)
         if i%5 == 0: # collect every 5th step
@@ -101,7 +101,7 @@ if __name__ == "__main__":
         steps = 0 # buffer index
         maneuver, seed = 0, 0
         for episode_number in (t:=trange(BUFFER_SIZE//STEP_SIZE)):
-            steps += sample_episode(Xn, Mn, Yn, steps, env, maneuver if maneuver != 2 else 3, seed)
+            steps += sample_episode(Xn, Mn, Yn, steps, env, maneuver, seed)
             maneuver = (maneuver + 1) % 3
             if episode_number % 3 == 0: seed += 1
             t.set_description(f"sz: {steps:5d}")
@@ -137,7 +137,7 @@ if __name__ == "__main__":
     torch.save(tinycar_combo.state_dict(), MODEL_SAVEFILE)
     print("Evaluating:")
     for maneuver in range(3):
-        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver if maneuver != 2 else 3, render_mode="human")
+        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, render_mode="human", steps=1000, episodes=5)
         print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte:.4f} m/step | H-Error: {heading_error:.4f} rad/step | Terms: {terminations:3d} | perf: {stepss:.2f} steps/s")
 
 

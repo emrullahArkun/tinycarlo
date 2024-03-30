@@ -11,7 +11,7 @@ import time
 
 from tinycarlo.wrapper.reward import CTELinearRewardWrapper, LanelineSparseRewardWrapper
 from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper, CTETerminationWrapper
-from examples.models.tinycar_net import TinycarActorLSTM, TinycarCriticLSTM, TinycarCombo, TinycarEncoder
+from examples.models.tinycar_net import TinycarActorTemporal, TinycarCriticTemporal, TinycarCombo, TinycarEncoder
 from examples.benchmark_tinycar_net import pre_obs, evaluate
 from tinycarlo.helper import getenv
 from examples.rl_utils import avg_w, create_action_loss_graph, create_critic_loss_graph, create_ep_rew_graph, Replaybuffer, ReplaybufferTemporal
@@ -21,7 +21,7 @@ BATCH_SIZE = 64
 REPLAY_BUFFER_SIZE = 100_000
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 2e-4
-EPISODES = 100
+EPISODES = 300
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
@@ -36,7 +36,7 @@ NOISE_SIGMA = 0.2
 
 SEQ_LEN = 5
 
-MODEL_SAVEFILE = "/tmp/tinycar_combo_td3.pt"
+MODEL_SAVEFILE = "/tmp/actor_td3.pt"
 PLOT = getenv("PLOT")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
@@ -54,12 +54,12 @@ if __name__ == "__main__":
     tinycar_combo = TinycarCombo(obs.shape)
     tinycar_combo.load_pretrained(device)
     encoder = tinycar_combo.encoder
-    actor = TinycarActorLSTM()
-    actor_target = TinycarActorLSTM()
-    critic1 = TinycarCriticLSTM()
-    critic2 = TinycarCriticLSTM()
-    critic_target1 = TinycarCriticLSTM()
-    critic_target2 = TinycarCriticLSTM()
+    actor = TinycarActorTemporal()
+    actor_target = TinycarActorTemporal()
+    critic1 = TinycarCriticTemporal()
+    critic2 = TinycarCriticTemporal()
+    critic_target1 = TinycarCriticTemporal()
+    critic_target2 = TinycarCriticTemporal()
 
     encoder.to(device)
     actor.to(device)
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     noise = torch.zeros(action_dim).to(device)
     exploration_rate = 1.0
 
-    print( f"using Device: {device} | actor params {sum([p.numel() for p in actor.parameters()])} | critic params {sum([p.numel() for p in critic1.parameters()])}")
+    print( f"using Device: {device} | actor params {sum([p.numel() for p in actor.parameters()]):,} | critic params {sum([p.numel() for p in critic1.parameters()]):,}")
 
     def train_step_critic(x, m, a, r, x1, m1):
         global noise
@@ -172,13 +172,14 @@ if __name__ == "__main__":
         rews.append(ep_rew)
 
     print(f"Saving model to: {MODEL_SAVEFILE}")
-    torch.save(tinycar_combo.state_dict(), MODEL_SAVEFILE)
+    torch.save(actor.state_dict(), MODEL_SAVEFILE)
 
     if PLOT: create_critic_loss_graph(c1_loss, c2_loss)
     if PLOT: create_action_loss_graph(a_loss)
     if PLOT: create_ep_rew_graph(rews)
 
     print("Evaluating:")
+    tinycar_combo.actor = actor
     for maneuver in range(3):
-        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env.unwrapped, maneuver=maneuver if maneuver != 2 else 3,render_mode="human", steps=2000, episodes=5)
+        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env.unwrapped, maneuver=maneuver,render_mode="human", steps=1000, episodes=5, temporal=SEQ_LEN)
         print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte:.4f} m/step | H-Error: {heading_error:.4f} rad/step | Terms: {terminations:3d} | perf: {stepss:.2f} steps/s")

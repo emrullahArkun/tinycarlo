@@ -8,7 +8,7 @@ import os, sys, time
 import numpy as np
 from tqdm import trange
 
-from examples.models.tinycar_net import TinycarCombo
+from examples.models.tinycar_net import TinycarCombo, TinycarEncoder, TinycarComboTemporal
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,7 +21,7 @@ def pre_obs(obs: np.ndarray) -> np.ndarray:
     # cropping and normalizing the image
     return np.stack([obs[i,obs.shape[1]//2:,:]/255 for i in range(obs.shape[0])], axis=0).astype(np.float32)
 
-def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: int = 0, speed = 0.3, steps = 5000, episodes = 5, render_mode=None) -> Tuple[float, float, float, int, float]:
+def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: int = 0, speed = 0.5, steps = 5000, episodes = 5, render_mode=None, temporal: int = 1) -> Tuple[float, float, float, int, float]:
     """
     Tests the model in the environment for a given maneuver.
     Returns total reward, average CTE, and average heading error
@@ -34,21 +34,27 @@ def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: i
     env = LanelineSparseRewardWrapper(env, sparse_rewards={"outer": -10.0})
     env = CTETerminationWrapper(env, max_cte=0.1)
 
-    def get_steering_angle(x, m):
+    def get_steering_angle(x, m, seq_x):
         with torch.no_grad():
-            out = model.forward(x, m)[0].cpu().item()
+            if temporal > 1:
+                seq_x = seq_x.roll(1, 0)
+                seq_x[0] = model.encoder(x.unsqueeze(0))[0]
+                out = model.actor(seq_x.unsqueeze(0), m)[0].cpu().item()
+            else:
+                out = model.forward(x.unsqueeze(0), m)[0].cpu().item()
         return out
 
     obs = env.reset(seed=seed)[0]
     total_rew, cte, heading_error, terminations, inf_time = 0.0, [], [], 0, []
     terminated, truncated = False, False
+    seq_x = torch.zeros(temporal, TinycarEncoder.FEATURE_VEC_SIZE).to(device)
     for i in range(int(steps * episodes)):
         st = time.perf_counter()
-        x = torch.from_numpy(pre_obs(obs.astype(np.float32))).unsqueeze(0).to(device)
+        x = torch.from_numpy(pre_obs(obs.astype(np.float32))).to(device)
         m = F.one_hot(torch.tensor(maneuver), num_classes=model.m_dim).float().unsqueeze(0).to(device)
-        steering_angle = get_steering_angle(x, m)
+        steering_angle = get_steering_angle(x, m, seq_x)
         inf_time.append(time.perf_counter() - st)
-        obs, rew, terminated, truncated, info = env.step({"car_control": [speed, steering_angle], "maneuver": maneuver})
+        obs, rew, terminated, truncated, info = env.step({"car_control": [speed, steering_angle], "maneuver": maneuver if maneuver != 2 else 3})
         total_rew += rew
         cte.append(abs(info["cte"]))
         heading_error.append(abs(info["heading_error"]))
@@ -65,12 +71,12 @@ if __name__ == "__main__":
 
     obs = pre_obs(env.reset(seed=ENV_SEED)[0]) # seed the environment and get obs shape
 
-    tinycar_combo = TinycarCombo(obs.shape)
-    if tinycar_combo.load_pretrained() == False and len(sys.argv) == 2:
+    tinycar_combo = TinycarComboTemporal(obs.shape)
+    if len(sys.argv) == 2:
         tinycar_combo.load_state_dict(torch.load(sys.argv[1]))
 
     for maneuver in range(3):
-        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver if maneuver != 2 else 3, steps=10000, episodes=1, render_mode="human")
+        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, steps=2000, episodes=1, render_mode="human", temporal=5)
         print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte:.4f} m/step | Heading Error: {heading_error:.4f} rad/step | Terminations: {terminations:3d} | perf: {stepss:.2f} steps/s")
     
 
