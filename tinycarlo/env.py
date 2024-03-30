@@ -42,6 +42,7 @@ class TinyCarloEnv(gym.Env):
         self.render_realtime: bool = config['sim'].get('render_realtime', False)
         self.observation_space_format: str = config['sim'].get('observation_space_format', "rgb")
         self.overview_pixel_per_meter: int = config['sim'].get('overview_pixel_per_meter', 150)
+        self.render_node_names: bool = config['sim'].get('render_node_names', False)
 
         self.map: Map = Map(config['map'], base_path=self.config_path)
         self.car: Car = Car(self.T, self.map, config['car'])

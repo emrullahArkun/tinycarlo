@@ -7,13 +7,14 @@ from tinycarlo.map import Map
 from tinycarlo.car import Car
 
 class Renderer():
-    def __init__(self, map: Map, car: Optional[Car] = None, overview_pixel_per_meter: int = 266, background_color: Optional[Tuple[int, int, int]] = None, line_thickness: int = 1):
+    def __init__(self, map: Map, car: Optional[Car] = None, overview_pixel_per_meter: int = 266, background_color: Optional[Tuple[int, int, int]] = None, line_thickness: int = 1, node_names: bool = False):
         self.map: Map = map
         self.car: Car = car
         self.overview_pixel_per_meter: int =  overview_pixel_per_meter
         self.background_color: Optional[Tuple[int, int, int]] = background_color
         self.line_thickness: int = line_thickness
-        self.static_overview: np.ndarray = self.__render_static_overview()
+        self.node_names: bool = node_names
+        self.static_overview: np.ndarray = self.__render_static_overview(node_names)
 
     def render_overview(self) -> np.ndarray:
         # Map render
@@ -49,7 +50,7 @@ class Renderer():
                 frame[i] = cv2.polylines(frame[i], np.int32([line]), False, 255, line_thickness)
         return frame
 
-    def __render_static_overview(self) -> np.ndarray:
+    def __render_static_overview(self, node_names: bool) -> np.ndarray:
         """
         Renders the static parts of the overview, which will only be rendered once.
         """
@@ -66,6 +67,11 @@ class Renderer():
         path = self.map.get_lanepath()
         for line in path:
             overview = cv2.polylines(overview, self.__scale_points(line), False, (50,50,50), self.line_thickness)
+        
+        # render lane path node names
+        if node_names:
+            for i, node in enumerate(self.map.lanepath.nodes):
+                cv2.putText(overview, str(i), tuple(np.int32(np.array(node) * self.overview_pixel_per_meter)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50,50,50), 1, cv2.LINE_AA)
         return overview
     
     def __scale_points(self, points: np.ndarray) -> np.ndarray:
