@@ -63,6 +63,7 @@ class Car():
                 # if the car is not within the bounds of the edge, the distance is the minimum distance to the edge nodes
                 distances[layer_name] = min(self.map.lanelines[i].distance_to_node(self.position, nearest_edge[0]), self.map.lanelines[i].distance_to_node(self.position_front, nearest_edge[1]))
         # set local path for reference tracking. Instead of having a list of edges we want to have a list of coordinates
+        print(self.local_path)
         local_path_coordinates = [self.map.lanepath.nodes[edge[1]] for edge in self.local_path]
 
         return cte, heading_error, distances, local_path_coordinates
@@ -138,14 +139,10 @@ class Car():
         self.local_path = [nearest_edge]
         for _ in range(looking_ahead):
             last_edge = self.local_path[-1]
-            if self.velocity > 0:
-                next_edge = last_edge[1], self.map.lanepath.pick_node_given_orientation(last_edge[1], maneuver_dir_world_frame, self.map.lanepath.get_next_nodes(last_edge[1]))
-                if next_edge is None:
-                    return True
-            else:
-                next_edge = last_edge[0], self.map.lanepath.pick_node_given_orientation(last_edge[0], maneuver_dir_world_frame, self.map.lanepath.get_prev_nodes(last_edge[0]))
-                if next_edge is None:
-                    return True
+            next_edge_idx = 1 if self.velocity > 0 else 0
+            next_edge = last_edge[next_edge_idx], self.map.lanepath.pick_node_given_orientation(last_edge[next_edge_idx], maneuver_dir_world_frame, self.map.lanepath.get_next_nodes(last_edge[next_edge_idx]))
+            if next_edge[1] is None:
+                return True
             self.local_path.append(next_edge)
         return False
 
