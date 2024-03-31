@@ -63,7 +63,6 @@ class Car():
                 # if the car is not within the bounds of the edge, the distance is the minimum distance to the edge nodes
                 distances[layer_name] = min(self.map.lanelines[i].distance_to_node(self.position, nearest_edge[0]), self.map.lanelines[i].distance_to_node(self.position_front, nearest_edge[1]))
         # set local path for reference tracking. Instead of having a list of edges we want to have a list of coordinates
-        print(self.local_path)
         local_path_coordinates = [self.map.lanepath.nodes[edge[1]] for edge in self.local_path]
 
         return cte, heading_error, distances, local_path_coordinates
