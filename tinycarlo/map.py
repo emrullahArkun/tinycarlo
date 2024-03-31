@@ -60,7 +60,7 @@ class Map():
         random_node_idx: NodeIdx = np_random.integers(0, len(self.lanepath.nodes)-1, size=1, dtype=int)[0] if self.spawn_points is None else np_random.choice(self.spawn_points)
         next_node = self.lanepath.get_next_nodes(random_node_idx)
         if len(next_node) == 0:
-            return self.sample_spawn()
+            return self.sample_spawn(np_random)
         # calculate the angle between the two nodes
         position = self.lanepath.nodes[random_node_idx].copy()
         next_position = self.lanepath.nodes[next_node[0]]
