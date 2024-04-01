@@ -19,4 +19,5 @@ camera:
   line_thickness: 4 # in px
 map:
   json_path: ./maps/knuffingen.json # path to map file
-  pixel_per_meter: 250
+  pixel_per_meter: 222
+  spawn_points: [156, 18, 217, 214, 325,354, 176, 402, 339, 376, 385, 419, 396, 37, 149, 62, 240, 113, 98, 299, 2]
