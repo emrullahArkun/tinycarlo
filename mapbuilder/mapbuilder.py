@@ -26,10 +26,23 @@ colors: Dict[str, Tuple[int, int, int]] = {
 }
 
 # Load an image to use as background
-if len(sys.argv) == 2:
+if len(sys.argv) >= 2:
     image: np.ndarray = cv2.imread(sys.argv[1])  # Replace "background.jpg" with your image file path
 else:
     image: np.ndarray = np.zeros((512, 512, 3), np.uint8)  # Create a black image if no image file is provided
+
+if len(sys.argv) == 3:
+    map_dict: Dict[str, Any] = json.load(open(sys.argv[2], "r"))
+    for layer_name, layer_dict in map_dict["lanelines"].items():
+        layer_builders.append(LayerBuilder(layer_name, layer_dict["layer_color"], False, image))
+        layer_builders[-1].nodes = layer_dict["nodes"]
+        layer_builders[-1].edges = layer_dict["edges"]
+        image = layer_builders[-1].render_final()
+    if map_dict["lanepath"]:
+        layer_builders.append(LayerBuilder("lanepath", map_dict["lanepath"]["layer_color"], True, image))
+        layer_builders[-1].nodes = map_dict["lanepath"]["nodes"]
+        layer_builders[-1].edges = map_dict["lanepath"]["edges"]
+        image = layer_builders[-1].render_final()
 
 # Mouse callback function
 def on_mouse(event, x, y, flags, params):

@@ -6,9 +6,9 @@ The mapbuilder is a tool to create custom tracks for the [tinycarlo](../README.m
 ## Usage
 After installing tinycarlo, you can start the mapbuilder with the following command:
 ```bash
-tinycarlo.mapbuilder /path/to/an/image.png 
+tinycarlo.mapbuilder /path/to/an/image.png [/path/to/map.json]
 ```
-Inside the tinycarlo repo, you can use `examples/maps/simple_layout.png` as an testing image. If no argument is provided, a new image with the default size of 512x512 is created.
+Inside the tinycarlo repo, you can use `examples/maps/simple_layout.png` as an testing image. If no argument is provided, a new image with the default size of 512x512 is created. The second argument (.json) is optional to load an existing map.
 
 ### Layers
 The mapbuilder supports multiple layers, which can be used to create different lanelines and lanepaths. The layers are saved in the order they are created. Each layer represents a class of laneline or a lanepath. 
