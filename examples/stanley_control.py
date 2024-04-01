@@ -31,7 +31,7 @@ config = {
     },
     "map": {
         "json_path": os.path.join(os.path.dirname(__file__), "maps/knuffingen.json"),
-        "pixel_per_meter": 250
+        "pixel_per_meter": 222
     }
 }
 env = gym.make("tinycarlo-v2", config=config, render_mode="human")
@@ -49,7 +49,6 @@ while True:
     steering_angle = (heading_error + steering_correction) * 180 / math.pi / config["car"]["max_steering_angle"]
     action = {"car_control": [speed, steering_angle], "maneuver": 3} # always try to turn left
     observation, reward, terminated, truncated, info = env.step(action)
-    print(steering_angle)
     if terminated or truncated:
         observation, info = env.reset()
         break
