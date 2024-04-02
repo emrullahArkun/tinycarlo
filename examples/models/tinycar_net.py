@@ -48,13 +48,13 @@ class TinycarEncoder(nn.Module):
 class TinycarActor(nn.Module):
     def __init__(self, in_features: int = TinycarEncoder.FEATURE_VEC_SIZE, maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM):
         super(TinycarActor, self).__init__()
-        self.fcm1 = nn.Linear(maneuver_dim, 50)
-        self.fcm2 = nn.Linear(50, 100)
-        self.fcm3 = nn.Linear(100, in_features)
-        self.fc1 = nn.Linear(in_features*2, 100)
-        self.fc2 = nn.Linear(100, 50)
-        self.fc3 = nn.Linear(50, 10)
-        self.fc4 = nn.Linear(10, action_dim)
+        self.fcm1 = nn.Linear(maneuver_dim, 100)
+        self.fcm2 = nn.Linear(100, 200)
+        self.fcm3 = nn.Linear(200, in_features)
+        self.fc1 = nn.Linear(in_features*2, 200)
+        self.fc2 = nn.Linear(200, 100)
+        self.fc3 = nn.Linear(100, 100)
+        self.fc4 = nn.Linear(100, action_dim)
 
     def forward(self, f: torch.tensor, m: torch.tensor) -> torch.tensor:
         m = F.relu(self.fcm1(m))
@@ -69,16 +69,16 @@ class TinycarActor(nn.Module):
 class TinycarActorTemporal(nn.Module):
     def __init__(self, in_features: int = TinycarEncoder.FEATURE_VEC_SIZE, maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM):
         super(TinycarActorTemporal, self).__init__()
-        self.cnn1 =nn.Conv1d(5, 16, 3, padding=1)
-        self.cnn2 =nn.Conv1d(16, 16, 3, padding=2, dilation=2)
+        self.cnn1 =nn.Conv1d(5, 32, 3, padding=1)
+        self.cnn2 =nn.Conv1d(32, 16, 3, padding=2, dilation=2)
         self.cnn3 =nn.Conv1d(16, 16, 3, padding=4, dilation=4)
-        self.fcm1 = nn.Linear(maneuver_dim, 50)
-        self.fcm2 = nn.Linear(50, 100)
-        self.fcm3 = nn.Linear(100, in_features)
-        self.fc1 = nn.Linear(in_features*2, 100)
-        self.fc2 = nn.Linear(100, 50)
-        self.fc3 = nn.Linear(50, 10)
-        self.fc4 = nn.Linear(10, action_dim)
+        self.fcm1 = nn.Linear(maneuver_dim, 100)
+        self.fcm2 = nn.Linear(100, 200)
+        self.fcm3 = nn.Linear(200, in_features)
+        self.fc1 = nn.Linear(in_features*2, 200)
+        self.fc2 = nn.Linear(200, 100)
+        self.fc3 = nn.Linear(100, 100)
+        self.fc4 = nn.Linear(100, action_dim)
 
     def forward(self, f: torch.tensor, m: torch.tensor) -> torch.tensor:
         f = F.relu(self.cnn1(f))

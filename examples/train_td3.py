@@ -17,36 +17,35 @@ from tinycarlo.helper import getenv
 from examples.rl_utils import avg_w, create_action_loss_graph, create_critic_loss_graph, create_ep_rew_graph, Replaybuffer, ReplaybufferTemporal
 
 # *** hyperparameters ***
-BATCH_SIZE = 64
-REPLAY_BUFFER_SIZE = 100_000
+BATCH_SIZE = 256
+REPLAY_BUFFER_SIZE = 400_000
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 2e-4
-EPISODES = 300
+EPISODES = 700
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
-MAX_STEPS = 1000
+MAX_STEPS = 2000
 
 # *** environment parameters ***
 SPEED = 0.5
 
-NOISE_THETA = 0.2
+NOISE_THETA = 0.1
 NOISE_MEAN = 0.0
-NOISE_SIGMA = 0.2
+NOISE_SIGMA = 0.4
 
 SEQ_LEN = 5
 
 MODEL_SAVEFILE = "/tmp/actor_td3.pt"
-PLOT = getenv("PLOT")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
 if __name__ == "__main__":
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_simple_layout.yaml")
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_knuffingen.yaml")
     env = gym.make("tinycarlo-v2", config=config_path)
 
     env = CTELinearRewardWrapper(env, min_cte=0.03, max_reward=1.0)
-    #env = LanelineSparseRewardWrapper(env, sparse_rewards={"solid": -2.0, "area": -2.0, "outer": -10.0})
+   # env = LanelineSparseRewardWrapper(env, sparse_rewards={"solid": -1.0, "area": -2.0, "outer": -2.0})
     #env = LanelineCrossingTerminationWrapper(env, ["outer"])
     env = CTETerminationWrapper(env, max_cte=0.15)
 
@@ -86,7 +85,6 @@ if __name__ == "__main__":
     replay_buffer = ReplaybufferTemporal(REPLAY_BUFFER_SIZE, BATCH_SIZE, (TinycarEncoder.FEATURE_VEC_SIZE,), maneuver_dim, action_dim, SEQ_LEN)
 
     noise = torch.zeros(action_dim).to(device)
-    exploration_rate = 1.0
 
     print( f"using Device: {device} | actor params {sum([p.numel() for p in actor.parameters()]):,} | critic params {sum([p.numel() for p in critic1.parameters()]):,}")
 
@@ -129,7 +127,7 @@ if __name__ == "__main__":
         global noise, exploration_rate
         with torch.no_grad():
             noise += NOISE_THETA * (NOISE_MEAN - noise) + NOISE_SIGMA * torch.randn(action_dim).to(device) # Ornstein-Uhlenbeck process
-            action = (actor(feature_vec.unsqueeze(0), maneuver.unsqueeze(0))[0] + noise * exploration_rate).clamp(-1, 1).cpu()
+            action = (actor(feature_vec.unsqueeze(0), maneuver.unsqueeze(0))[0] + noise).clamp(-1, 1).cpu()
         return action
     
     def get_feature_vec(obs: torch.Tensor) -> torch.Tensor:
@@ -147,7 +145,7 @@ if __name__ == "__main__":
 
         noise = torch.zeros(action_dim).to(device) # reset the noise
         maneuver = np.random.randint(0, 3)
-        #exploration_rate = 1 - (episode_number / EPISODES)
+        NOISE_SIGMA = 0.4 * (1 - (episode_number / EPISODES))
         ep_rew = 0
         for ep_step in range(MAX_STEPS):
             m = F.one_hot(torch.tensor(maneuver), tinycar_combo.m_dim).float().to(device)
@@ -174,12 +172,12 @@ if __name__ == "__main__":
     print(f"Saving model to: {MODEL_SAVEFILE}")
     torch.save(actor.state_dict(), MODEL_SAVEFILE)
 
-    if PLOT: create_critic_loss_graph(c1_loss, c2_loss)
-    if PLOT: create_action_loss_graph(a_loss)
-    if PLOT: create_ep_rew_graph(rews)
+    create_critic_loss_graph(c1_loss, c2_loss)
+    create_action_loss_graph(a_loss)
+    create_ep_rew_graph(rews)
 
     print("Evaluating:")
     tinycar_combo.actor = actor
     for maneuver in range(3):
-        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env.unwrapped, maneuver=maneuver,render_mode="human", steps=1000, episodes=5, temporal=SEQ_LEN)
+        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env.unwrapped, maneuver=maneuver,render_mode=None, steps=2000, episodes=5, temporal=SEQ_LEN)
         print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte:.4f} m/step | H-Error: {heading_error:.4f} rad/step | Terms: {terminations:3d} | perf: {stepss:.2f} steps/s")

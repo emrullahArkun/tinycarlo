@@ -16,15 +16,15 @@ from tinycarlo.wrapper import CTETerminationWrapper
 from examples.benchmark_tinycar_net import pre_obs, evaluate
 
 LEARNING_RATE = 1e-4
-BATCH_SIZE = 16
-STEPS = 5000
+BATCH_SIZE = 32
+STEPS = 10000
 
 ### Data Collection
 STEP_SIZE = 2000 # number of steps to take per episode
-BUFFER_SIZE = 60_000
+SKIP_STEPS = 2
+BUFFER_SIZE = 150_000 # change this if you have not enough memory (150_000 = 27 GB)
 BUFFER_SAVEFILE = "/tmp/stanley_training_data.npz" if len(sys.argv) != 2 else sys.argv[1]
-MODEL_SAVEFILE = "/tmp/tinycar_combo.pt" if len(sys.argv) != 3 else sys.argv[2]
-PLOT = getenv("PLOT")
+MODEL_SAVEFILE = "/tmp/tinycar_combo.pt" if len(sys.argv) != 3 else sys.argv[2] 
 
 ENV_SEED = 2
 SPEED = 0.5
@@ -32,11 +32,11 @@ K = 5
 
 NOISE_THETA = 0.1
 NOISE_MEAN = 0.0
-NOISE_SIGMA = 0.4
+NOISE_SIGMA = 0.4 # we put in a lot of noise so network is more robust
 
 action_dim = 1
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
 noise = np.zeros(action_dim)
 
@@ -50,24 +50,24 @@ def create_loss_graph(loss: List[float]):
 def sample_episode(Xn, Mn, Yn, old_steps, env, maneuver = 0, seed = 0):
     global noise
     # random camera params
-    pitch = np.random.randint(0, 25)
-    fov = np.random.randint(80, 120)
+    pitch = np.random.randint(10, 25)
+    fov = np.random.randint(100, 120)
     env.unwrapped.camera.orientation[0] = pitch
     env.unwrapped.camera.fov = fov
     env.unwrapped.camera.update_params()
 
     obs, info = env.reset(seed=seed)
     steps = 0
-    for i in range(STEP_SIZE*5):
+    for i in range(STEP_SIZE*SKIP_STEPS):
         cte, heading_error = info["cte"], info["heading_error"]
         # Lateral Control with Stanley Controller
         steering_correction = math.atan2(K * cte, SPEED)
         steering_angle = (heading_error + steering_correction) * 180 / math.pi / env.unwrapped.config["car"]["max_steering_angle"]
         noise += NOISE_THETA * (NOISE_MEAN - noise) + NOISE_SIGMA * np.random.randn(action_dim) # Ornstein-Uhlenbeck process
         action = {"car_control": [SPEED, steering_angle + noise[0]], "maneuver": maneuver if maneuver != 2 else 3}
-        env.unwrapped.no_observation = False if (i+1)%5 == 0 else True
+        env.unwrapped.no_observation = False if (i+1)%SKIP_STEPS == 0 else True
         next_obs, _, terminated, truncated, info = env.step(action)
-        if i%5 == 0: # collect every 5th step
+        if i%SKIP_STEPS == 0: # collect every SKIP_STEPS step
             Xn[old_steps+steps] = pre_obs(obs)
             Mn[old_steps+steps] = maneuver
             Yn[old_steps+steps] = steering_angle
@@ -79,7 +79,7 @@ def sample_episode(Xn, Mn, Yn, old_steps, env, maneuver = 0, seed = 0):
     return steps
     
 if __name__ == "__main__":
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_simple_layout.yaml")
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_knuffingen.yaml")
     env = gym.make("tinycarlo-v2", config=config_path)
     env = CTETerminationWrapper(env, max_cte=0.15)
 
@@ -89,11 +89,11 @@ if __name__ == "__main__":
     opt = optim.Adam(tinycar_combo.parameters(), lr=LEARNING_RATE)
  
     print(f"using Device: {device} | encoder params: {sum([p.numel() for p in tinycar_combo.encoder.parameters()]):,} | actor params: {sum([p.numel() for p in tinycar_combo.actor.parameters()]):,}")
-    # check if training data exists in /tmp
+    # check if training data exists
     if os.path.exists(BUFFER_SAVEFILE):
         print(f"Loading training data from disk: {BUFFER_SAVEFILE}")
         data = np.load(BUFFER_SAVEFILE)
-        Xn, Mn, Yn = data["Xn"].astype(np.float32), data["Mn"].astype(np.float32), data["Yn"].astype(np.float32)
+        Xn, Mn, Yn = data["Xn"], data["Mn"], data["Yn"]
         steps = Xn.shape[0]
     else:
         print("Collecting training data:")
@@ -131,13 +131,13 @@ if __name__ == "__main__":
             losses.append(loss_mean)
         t.set_description(f"loss: {loss_mean:.7f}")
 
-    if PLOT: create_loss_graph(losses[1:])
+    create_loss_graph(losses[1:])
     
     print(f"Saving model to: {MODEL_SAVEFILE}")
     torch.save(tinycar_combo.state_dict(), MODEL_SAVEFILE)
     print("Evaluating:")
     for maneuver in range(3):
-        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, render_mode="human", steps=1000, episodes=5)
+        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, render_mode=None, steps=2000, episodes=5)
         print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte:.4f} m/step | H-Error: {heading_error:.4f} rad/step | Terms: {terminations:3d} | perf: {stepss:.2f} steps/s")
 
 
