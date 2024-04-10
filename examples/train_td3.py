@@ -18,10 +18,10 @@ from examples.rl_utils import avg_w, create_action_loss_graph, create_critic_los
 
 # *** hyperparameters ***
 BATCH_SIZE = 256
-REPLAY_BUFFER_SIZE = 400_000
+REPLAY_BUFFER_SIZE = 500_000
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 2e-4
-EPISODES = 700
+EPISODES = 1000
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
@@ -34,7 +34,7 @@ NOISE_THETA = 0.1
 NOISE_MEAN = 0.0
 NOISE_SIGMA = 0.4
 
-SEQ_LEN = 5
+SEQ_LEN = 10
 
 MODEL_SAVEFILE = "/tmp/actor_td3.pt"
 
@@ -44,10 +44,10 @@ if __name__ == "__main__":
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_knuffingen.yaml")
     env = gym.make("tinycarlo-v2", config=config_path)
 
-    env = CTELinearRewardWrapper(env, min_cte=0.03, max_reward=1.0)
+    env = CTELinearRewardWrapper(env, min_cte=0.06, max_reward=1.0)
    # env = LanelineSparseRewardWrapper(env, sparse_rewards={"solid": -1.0, "area": -2.0, "outer": -2.0})
     #env = LanelineCrossingTerminationWrapper(env, ["outer"])
-    env = CTETerminationWrapper(env, max_cte=0.15)
+    env = CTETerminationWrapper(env, max_cte=0.3)
 
     obs = pre_obs(env.reset()[0])  # seed the environment and get obs shape
     tinycar_combo = TinycarCombo(obs.shape)
