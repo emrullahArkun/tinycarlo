@@ -122,7 +122,10 @@ class Car():
                 self.rotation += 2 * math.pi
         self.__update_position_front()
 
-        # calculate local path for reference tracking
+        return self.find_local_path(maneuver)
+    
+    def find_local_path(self, maneuver: int) -> bool:
+         # calculate local path for reference tracking
         maneuver_dir_world_frame = clip_angle((self.map.lanepath.orientation_of_edge(self.local_path[0]) + maneuver * math.pi/2))
         if maneuver == 2 and self.last_maneuver != 2:
             # u turn maneuver
@@ -144,6 +147,7 @@ class Car():
                 return True
             self.local_path.append(next_edge)
         return False
+
 
     def get_transformation_matrix(self) -> np.ndarray:
         ''' 

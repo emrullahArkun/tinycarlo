@@ -66,3 +66,18 @@ class Map():
         next_position = self.lanepath.nodes[next_node[0]]
         rotation = math.atan2(next_position[1]-position[1], next_position[0]-position[0])
         return position, rotation, (random_node_idx, next_node[0])
+    
+    def sample_nearest_edge(self, position: Node) -> Tuple[Node, float, Edge]:
+        """
+        Samples the nearest edge to the given position.
+
+        Args:
+            position (Node): The position to sample the nearest edge from.
+
+        Returns:
+            Tuple[Node, float, Edge]: A tuple containing the nearest position, rotation, and edge information.
+        """
+        nearest_edge: Edge = self.lanepath.get_nearest_edge(position)
+        position = self.lanepath.nodes[nearest_edge[0]]
+        rotation = self.lanepath.orientation_of_edge(nearest_edge)
+        return position, rotation, nearest_edge
