@@ -11,6 +11,7 @@ config = {
         "fps": 30,
         "render_realtime": True,
         "observation_space_format": "rgb", # "rgb" or "classes"
+        "real_world_env": "autosys"
     },
     "car": {
         "wheelbase": 0.0487, # distance between front and rear axle in meters
@@ -19,7 +20,8 @@ config = {
         "max_steering_angle": 35, # in degrees
         "steering_speed": 30, # in deg/s
         "max_acceleration": 0.1, # in m/s^2
-        "max_deceleration": 1 # in m/s^2
+        "max_deceleration": 1, # in m/s^2
+        "tinycar_hostname": "192.168.178.21",
     },
     "camera": {
         "position": [0.02, 0, 0.024], # [x,y,z] in m relative to middle of front axle (x: forward, y: right, z: up)
@@ -30,8 +32,8 @@ config = {
         "line_thickness": 6 # in pixels
     },
     "map": {
-        "json_path": os.path.join(os.path.dirname(__file__), "maps/knuffingen.json"),
-        "pixel_per_meter": 222
+        "json_path": os.path.join(os.path.dirname(__file__), "maps/simple_layout.json"),
+        "pixel_per_meter": 350 # 222
     }
 }
 env = gym.make("tinycarlo-v2", config=config, render_mode="human")
