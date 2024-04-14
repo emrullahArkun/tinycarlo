@@ -37,7 +37,7 @@ class Car():
         """
         self.position, self.rotation, nearest_edge = self.map.sample_spawn(np_random)
         self.local_path = [nearest_edge]
-        self.__update_position_front()
+        self.update_position_front()
         self.steering_angle = 0.0
         self.radius = 0.0
         self.velocity = 0.0
@@ -120,7 +120,7 @@ class Car():
                 self.rotation -= 2 * math.pi
             elif self.rotation < -math.pi:
                 self.rotation += 2 * math.pi
-        self.__update_position_front()
+        self.update_position_front()
 
         return self.find_local_path(maneuver)
     
@@ -165,7 +165,7 @@ class Car():
         T_M: np.ndarray = np.array([[1,0,0,-self.position[0]], [0,1,0,-self.position[1]], [0,0,1,0], [0,0,0,1]])
         return R_M @ T_M
     
-    def __update_position_front(self) -> None:
+    def update_position_front(self) -> None:
         self.position_front = (self.position[0] + self.wheelbase * math.cos(self.rotation), self.position[1] + self.wheelbase * math.sin(self.rotation))
 
     # For Visualisation
