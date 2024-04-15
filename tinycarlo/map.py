@@ -23,6 +23,7 @@ class Map():
             self.lanelines = [Layer(name, layer["layer_color"], layer["nodes"], layer["edges"]) for name, layer in map_data["lanelines"].items()]
             self.lanepath = Layer("lanepath", map_data["lanepath"]["layer_color"], map_data["lanepath"]["nodes"], map_data["lanepath"]["edges"])
             self.dimension = (map_data["height"], map_data["width"])
+            self.pixel_per_meter = pixel_per_meter
 
     def __change_scale(self, pixel_per_meter: int, map_data: Dict[str, Any]) -> None:
         map_data["height"] = map_data["height"] / pixel_per_meter
