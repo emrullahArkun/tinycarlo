@@ -39,7 +39,7 @@ class CarTracking():
         self.message_format = 'BHHf'
         self.receive_th = threading.Thread(target=self.receive)
         self.running = False
-        self.id_2_transform = np.eye(3)
+        self.id_2_transform = np.float32([[1.01, 0, -21], [0, 1.01, 410], [0, 0, 1]])
         self.last_tracking_data = None
 
     def transform_tracking_data(self, id, x,y, ori):
