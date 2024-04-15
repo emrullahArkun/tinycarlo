@@ -18,7 +18,7 @@ def sparse_reward(conditions: Dict[str, bool], sparse_rewards: Dict[str, float])
             reward += sparse_rewards[condition_name]
     return reward
 
-def linear_reward(x: float, max_x: float, max_reward: float = 1.0) -> float:
+def linear_reward(x: float, max_x: float, max_reward: float = 1.0, min_reward: float = 0.0) -> float:
     """
     Calculates the linear reward based on the input value.
 
@@ -32,6 +32,6 @@ def linear_reward(x: float, max_x: float, max_reward: float = 1.0) -> float:
     """
     y = (-max_reward/max_x) * abs(x) + max_reward
     if max_reward > 0:
-        return max(y, 0)
+        return max(y, min_reward)
     else:
-        return min(y, 0)
+        return min(y, min_reward)

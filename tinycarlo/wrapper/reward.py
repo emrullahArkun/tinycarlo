@@ -62,7 +62,7 @@ class CTESparseRewardWrapper(Wrapper):
         return observation, reward, terminated, truncated, info
     
 class CTELinearRewardWrapper(Wrapper):
-    def __init__(self, env, min_cte: float, max_reward: float = 1.0):
+    def __init__(self, env, min_cte: float, max_reward: float = 1.0, min_reward: float = 0.0):
         """
         Wrapper class that adds a linear reward based on the cross-track error (CTE) of the car to the lane path.
 
@@ -70,13 +70,15 @@ class CTELinearRewardWrapper(Wrapper):
             env (gym.Env): The environment to wrap.
             min_cte (float): The minimum cross-track error value in meters which is > 0.
             max_reward (float, optional): The maximum reward value. Defaults to 1.0.
+            min_reward (float, optional): The minimum reward value. Defaults to 0.0.
         """
         super().__init__(env)
         self.unwrapped.wrapped = True
         self.min_cte = min_cte
         self.max_reward = max_reward
+        self.min_reward = min_reward
 
     def step(self, action):
         observation, reward, terminated, truncated, info = self.env.step(action)
-        reward += linear_reward(info["cte"], self.min_cte, self.max_reward)
+        reward += linear_reward(info["cte"], self.min_cte, self.max_reward, self.min_reward)
         return observation, reward, terminated, truncated, info
