@@ -22,7 +22,7 @@ class LanelineCrossingTerminationWrapper(Wrapper):
         return observation, reward, terminated, truncated, info
     
 class CTETerminationWrapper(Wrapper):
-    def __init__(self, env, max_cte: float):
+    def __init__(self, env, max_cte: float, number_of_steps: int = 1):
         """
         Wrapper class for terminating the environment based on the cross-track error (CTE) of the car to the lane path.
 
@@ -33,9 +33,16 @@ class CTETerminationWrapper(Wrapper):
         super().__init__(env)
         self.unwrapped.wrapped = True
         self.max_cte = max_cte
+        self.number_of_steps = number_of_steps
+        self.steps_true = 0
 
     def step(self, action):
         observation, reward, terminated, truncated, info = self.env.step(action)
         if abs(info["cte"]) > self.max_cte:
-            terminated = True
+            self.steps_true += 1
+            if self.steps_true >= self.number_of_steps:
+                terminated = True
+                self.steps_true = 0
+        else:
+            self.steps_true = 0
         return observation, reward, terminated, truncated, info

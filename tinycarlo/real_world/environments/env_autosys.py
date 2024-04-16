@@ -3,6 +3,7 @@
 from typing import Dict, Optional, Tuple, Union, Any
 import time, math, socket, struct, threading
 import numpy as np
+from collections import deque
 
 from tinycarlo.camera import Camera
 from tinycarlo.car import Car
@@ -80,7 +81,7 @@ class AutosysCar(Car):
         super().__init__(T, map, config)
         self.tinycar_hostname = config.get('tinycar_hostname', 'localhost')
         self.tinycar = Tinycar(self.tinycar_hostname)
-        self.position_check_thres = 4
+        self.position_check_thres = 0.02
         self.reset_speed = 0.3
         self.tracking = CarTracking()
         self.tracking.start()
@@ -88,16 +89,19 @@ class AutosysCar(Car):
         self.position = None
         self.rotation = None
         self.last_velocity_update = None
-        self.pid_integral = 0.0
-        self.pid_pre_error = 0.0
-        self.pid_last_time = None
-        self.pid_kp = 2.0
-        self.pid_ki = 0.0
-        self.pid_kd = 0.0
-        self.x = [0.0]
-        self.graph = plt.plot(self.x)
-        plt.draw()
-        plt.show(block=False)
+        self.history = deque(maxlen=50)
+        self.velocity = 0.0 
+        # self.pid_integral = 0.0
+        # self.pid_pre_error = 0.0
+        # self.pid_last_time = None
+        # self.pid_kp = 5.0
+        # self.pid_ki = 0.0
+        # self.pid_kd = 10.0
+        # self.x = [0.0]
+        #self.graph = plt.plot(self.x)
+        #plt.ylim(0, 0.5)
+        #plt.draw()
+        #plt.show(block=False)
 
     def step(self, velocity: float, steering_angle: float, maneuver: int) -> bool:
         # steering angle in tinycarlo is -1 to 1, but for tinycar it is in degrees
@@ -110,7 +114,8 @@ class AutosysCar(Car):
             self.tinycar.setBlinkerRight()
         elif maneuver == 3:
             self.tinycar.setBlinkerLeft()
-        self.drive(steering_angle, velocity * self.max_velocity)
+        self.history.append((steering_angle, velocity))
+        self.drive(steering_angle, velocity)
 
         return self.find_local_path(maneuver=maneuver)
     
@@ -118,21 +123,36 @@ class AutosysCar(Car):
         """
         Resets the car by selecting the nearest edge from position and driving to the nearest node.
         """
-        if self.position is None:
+        if self.position is None or self.rotation is None:
             print("Waiting for first tracking data.")
             self.wait_for_tracking_data(timeout=False)
             print("First tracking data received.")
-        desired_position, desired_rotation, nearest_edge = self.map.sample_nearest_edge(self.position)
-        print(f"Resetting car to {desired_position} / {desired_rotation} on edge {nearest_edge} from {self.position} / {self.rotation}.")
+        
+        # automatic repositioning
+        desired_position, desired_rotation, nearest_edge = self.map.sample_nearest_edge(self.position, self.rotation)
+        self.local_path = [nearest_edge]
         while not self.check_position(desired_position):
             self.tinycar.setBlinkerHazard()
-            # Use stanley controller to drive to the nearest node
-            cte = self.map.lanepath.distance_to_edge(self.position, nearest_edge)
-            heading_error = clip_angle(desired_rotation - self.rotation)
-            steering_correction = math.atan2(5 * cte, self.reset_speed)
-            steering_angle = (heading_error + steering_correction) * 180 / math.pi / self.max_steering_angle
-            steering_angle = np.clip(steering_angle, -1, 1)
-            self.drive(steering_angle, self.reset_speed)
+            # check if we have a history
+            if len(self.history) > 0:
+                # use history to get back to street (nearest edge)
+                # we use max last 20 steps to reposition car
+                last_steering, last_speed = self.history.pop()
+                self.drive(last_steering, -last_speed)
+            else:
+                # history was not enough to get to a street node
+                if self.find_local_path(0, looking_ahead=10):
+                    # local path terminates, try different maneuver
+                    if self.find_local_path(3, looking_ahead=10):
+                        break
+                cte, heading_error, _, _ = self.get_info()
+                steering_correction = math.atan2(4 * cte, self.reset_speed)
+                steering_angle = (heading_error + steering_correction) * 180 / math.pi / self.max_steering_angle
+                steering_angle = np.clip(steering_angle, -1, 1)
+                self.drive(steering_angle, self.reset_speed)
+
+            # update nearest edge
+            desired_position, desired_rotation, nearest_edge = self.map.sample_nearest_edge(self.position, self.rotation)
         # arrived nearly at the desired position
         print("Arrived at desired position.")
         self.tinycar.setBlinkerOff()
@@ -142,9 +162,9 @@ class AutosysCar(Car):
         self.last_maneuver = 0
         self.radius = 0.0
         self.last_velocity_update = None
-        self.pid_integral = 0.0
-        self.pid_pre_error = 0.0
-        self.pid_last_time = None
+        # self.pid_integral = 0.0
+        # self.pid_pre_error = 0.0
+        # self.pid_last_time = None
     
     def drive(self, steering_angle, speed):
         """
@@ -152,28 +172,32 @@ class AutosysCar(Car):
         This is a blocking function and waits for the tracking data to be received. If no tracking data is received within the timeout, the car stops.
         """
         # apply PID
-        if self.pid_last_time is None:
-            self.pid_last_time = time.perf_counter()
-            return
-        dt = time.perf_counter() - self.pid_last_time
-        self.pid_last_time = time.perf_counter()
-        error = speed - self.velocity
-        pout = self.pid_kp * error
-        self.pid_integral += error * dt
-        iout = self.pid_ki * self.pid_integral
-        derivative = (error - self.pid_pre_error) / dt
-        dout = self.pid_kd * derivative
-        self.pid_pre_error = error
-        set_speed = pout + iout + dout
+        # if self.pid_last_time is None:
+        #     self.pid_last_time = time.perf_counter()
+        #     return
+        # dt = time.perf_counter() - self.pid_last_time
+        # self.pid_last_time = time.perf_counter()
+        # error = speed - self.velocity
+        # pout = self.pid_kp * error
+        # self.pid_integral += error * dt
+        # iout = self.pid_ki * self.pid_integral
+        # derivative = (error - self.pid_pre_error) / dt
+        # dout = self.pid_kd * derivative
+        # self.pid_pre_error = error
+        # set_speed = pout + iout + dout
+        # set_speed = np.clip(set_speed, 0, 1.0)
 
-        print(self.velocity, error)
-        self.x.append(self.velocity)
-        plt.clf()
-        plt.plot(self.x)
-        plt.draw()
+       #print(self.velocity, error)
+        #self.x.append(self.velocity)
+        #plt.clf()
+        #plt.plot(self.x)
+        #plt.draw()
 
+        if self.velocity < 0.01:
+            speed *= 2.5
+        speed = np.clip(speed, -1.0, 1.0)
         self.tinycar.setServoAngle(int(9000 + steering_angle * 100))
-        self.tinycar.setMotorDutyCycle(int(set_speed * 100))
+        self.tinycar.setMotorDutyCycle(int(speed * 100))
         if not self.wait_for_tracking_data():
             self.tinycar.setMotorDutyCycle(0)
             self.tinycar.setServoAngle(9000)

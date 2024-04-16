@@ -124,7 +124,7 @@ class Car():
 
         return self.find_local_path(maneuver)
     
-    def find_local_path(self, maneuver: int) -> bool:
+    def find_local_path(self, maneuver: int, looking_ahead: int = 3) -> bool:
          # calculate local path for reference tracking
         maneuver_dir_world_frame = clip_angle((self.map.lanepath.orientation_of_edge(self.local_path[0]) + maneuver * math.pi/2))
         if maneuver == 2 and self.last_maneuver != 2:
@@ -137,7 +137,6 @@ class Car():
                 return True
         self.last_maneuver = maneuver
 
-        looking_ahead = 3 # nodes to look ahead for local path
         self.local_path = [nearest_edge]
         for _ in range(looking_ahead):
             last_edge = self.local_path[-1]

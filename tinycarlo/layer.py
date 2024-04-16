@@ -56,7 +56,7 @@ class Layer():
         d = [self.distance(position, n) for n in self.nodes]
         return d.index(min(d))
     
-    def get_nearest_edge_with_orientation(self, position: Tuple[float, float], orientation: float) -> Optional[Edge]:
+    def get_nearest_edge_with_orientation(self, position: Tuple[float, float], orientation: float, margin: float = 30.0) -> Optional[Edge]:
         """
         Returns the nearest edge to the given position with the specified orientation (+/- 30 deg).
 
@@ -67,7 +67,7 @@ class Layer():
         Returns:
             Edge: The nearest edge to the given position with the specified orientation (+/- 30 deg).
         """
-        edges_within_orientation_range = [e for e in self.edges if abs(clip_angle(self.orientation_of_edge(e)-orientation)) <= math.radians(30)]
+        edges_within_orientation_range = [e for e in self.edges if abs(clip_angle(self.orientation_of_edge(e)-orientation)) <= math.radians(margin)]
         if len(edges_within_orientation_range) == 0:
             return None
         d = [abs(self.distance(position, self.nodes[e[0]]) + self.distance(position, self.nodes[e[1]])) for e in edges_within_orientation_range]
