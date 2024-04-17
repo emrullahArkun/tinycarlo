@@ -67,9 +67,9 @@ class TinycarActor(nn.Module):
         return F.tanh(self.fc4(out))
     
 class TinycarActorTemporal(nn.Module):
-    def __init__(self, in_features: int = TinycarEncoder.FEATURE_VEC_SIZE, maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM):
+    def __init__(self, in_features: int = TinycarEncoder.FEATURE_VEC_SIZE, maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM, seq_len: int = 5):
         super(TinycarActorTemporal, self).__init__()
-        self.cnn1 =nn.Conv1d(5, 32, 3, padding=1)
+        self.cnn1 =nn.Conv1d(seq_len, 32, 3, padding=1)
         self.cnn2 =nn.Conv1d(32, 16, 3, padding=2, dilation=2)
         self.cnn3 =nn.Conv1d(16, 16, 3, padding=4, dilation=4)
         self.fcm1 = nn.Linear(maneuver_dim, 100)
@@ -131,11 +131,11 @@ class TinycarCritic(nn.Module):
         return self.fc2(out)
     
 class TinycarCriticTemporal(nn.Module):
-    def __init__(self, maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM):
+    def __init__(self, maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM, seq_len: int = 5):
         super(TinycarCriticTemporal, self).__init__()
         self.fca = nn.Linear(action_dim, TinycarEncoder.FEATURE_VEC_SIZE)
         self.fcm = nn.Linear(maneuver_dim, TinycarEncoder.FEATURE_VEC_SIZE)
-        self.cnn1 =nn.Conv1d(5, 16, 3, padding=1)
+        self.cnn1 =nn.Conv1d(seq_len, 16, 3, padding=1)
         self.cnn2 =nn.Conv1d(16, 16, 3, padding=2, dilation=2)
         self.cnn3 =nn.Conv1d(16, 16, 3, padding=4, dilation=4)
         self.fc1 = nn.Linear(TinycarEncoder.FEATURE_VEC_SIZE*3, 512)

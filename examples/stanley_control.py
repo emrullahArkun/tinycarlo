@@ -3,7 +3,7 @@ import tinycarlo
 import os
 import math
 
-from tinycarlo.wrapper.reward import CTESparseRewardWrapper
+from tinycarlo.wrapper.reward import CTELinearRewardWrapper
 from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper
 
 config = {
@@ -37,7 +37,8 @@ config = {
     }
 }
 env = gym.make("tinycarlo-v2", config=config, render_mode="human")
-env = CTESparseRewardWrapper(env, 0.01)
+#env = CTESparseRewardWrapper(env, 0.01)
+env = CTELinearRewardWrapper(env, min_cte=0.04, max_reward=1.0, min_reward=-3.0)
 
 k = 5
 speed = 0.5
@@ -49,8 +50,9 @@ while True:
     # Lateral Control with Stanley Controller
     steering_correction = math.atan2(k * cte, speed)
     steering_angle = (heading_error + steering_correction) * 180 / math.pi / config["car"]["max_steering_angle"]
-    action = {"car_control": [speed, steering_angle], "maneuver": 3} # always try to turn left
+    action = {"car_control": [speed, steering_angle+0.8], "maneuver": 3} # always try to turn left
     observation, reward, terminated, truncated, info = env.step(action)
+    print(reward)
     if terminated or truncated:
         observation, info = env.reset()
         break
