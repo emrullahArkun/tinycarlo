@@ -41,24 +41,22 @@ MODEL_SAVEFILE = "/tmp/actor_td3.pt"
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
 if __name__ == "__main__":
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_knuffingen.yaml")
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_simple_layout.yaml")
     env = gym.make("tinycarlo-v2", config=config_path)
 
-    env = CTELinearRewardWrapper(env, min_cte=0.06, max_reward=1.0)
-   # env = LanelineSparseRewardWrapper(env, sparse_rewards={"solid": -1.0, "area": -2.0, "outer": -2.0})
-    #env = LanelineCrossingTerminationWrapper(env, ["outer"])
+    env = CTELinearRewardWrapper(env, min_cte=0.04, max_reward=1.0, min_reward=-3.0)
     env = CTETerminationWrapper(env, max_cte=0.3)
 
     obs = pre_obs(env.reset()[0])  # seed the environment and get obs shape
     tinycar_combo = TinycarCombo(obs.shape)
     tinycar_combo.load_pretrained(device)
     encoder = tinycar_combo.encoder
-    actor = TinycarActorTemporal()
-    actor_target = TinycarActorTemporal()
-    critic1 = TinycarCriticTemporal()
-    critic2 = TinycarCriticTemporal()
-    critic_target1 = TinycarCriticTemporal()
-    critic_target2 = TinycarCriticTemporal()
+    actor = TinycarActorTemporal(seq_len=SEQ_LEN)
+    actor_target = TinycarActorTemporal(seq_len=SEQ_LEN)
+    critic1 = TinycarCriticTemporal(seq_len=SEQ_LEN)
+    critic2 = TinycarCriticTemporal(seq_len=SEQ_LEN)
+    critic_target1 = TinycarCriticTemporal(seq_len=SEQ_LEN)
+    critic_target2 = TinycarCriticTemporal(seq_len=SEQ_LEN)
 
     encoder.to(device)
     actor.to(device)
