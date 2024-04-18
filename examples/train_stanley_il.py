@@ -20,9 +20,9 @@ BATCH_SIZE = 32
 STEPS = 10000
 
 ### Data Collection
-STEP_SIZE = 2000 # number of steps to take per episode
+STEP_SIZE = 1000 # number of steps to take per episode
 SKIP_STEPS = 2
-BUFFER_SIZE = 150_000 # change this if you have not enough memory (150_000 = 27 GB)
+BUFFER_SIZE = 25_000 # change this if you have not enough memory (150_000 = 27 GB)
 BUFFER_SAVEFILE = "/tmp/stanley_training_data.npz" if len(sys.argv) != 2 else sys.argv[1]
 MODEL_SAVEFILE = "/tmp/tinycar_combo.pt" if len(sys.argv) != 3 else sys.argv[2] 
 
@@ -50,8 +50,8 @@ def create_loss_graph(loss: List[float]):
 def sample_episode(Xn, Mn, Yn, old_steps, env, maneuver = 0, seed = 0):
     global noise
     # random camera params
-    pitch = np.random.randint(10, 25)
-    fov = np.random.randint(100, 120)
+    pitch = np.random.randint(10, 20)
+    fov = np.random.randint(90, 130)
     env.unwrapped.camera.orientation[0] = pitch
     env.unwrapped.camera.fov = fov
     env.unwrapped.camera.update_params()
@@ -79,7 +79,7 @@ def sample_episode(Xn, Mn, Yn, old_steps, env, maneuver = 0, seed = 0):
     return steps
     
 if __name__ == "__main__":
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_knuffingen.yaml")
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_simple_layout.yaml")
     env = gym.make("tinycarlo-v2", config=config_path)
     env = CTETerminationWrapper(env, max_cte=0.15)
 

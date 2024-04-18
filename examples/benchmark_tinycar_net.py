@@ -22,7 +22,7 @@ def pre_obs(obs: np.ndarray) -> np.ndarray:
     #return np.stack([obs[i,obs.shape[1]//2:,:]/255 for i in range(obs.shape[0])], axis=0).astype(np.float32)
     return (obs/255).astype(np.float32)
 
-def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: int = 0, speed = 0.5, steps = 5000, episodes = 5, render_mode=None, temporal: int = 1) -> Tuple[float, float, float, int, float]:
+def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: int = 0, speed = 0.3, steps = 5000, episodes = 5, render_mode=None, temporal: int = 1) -> Tuple[float, float, float, int, float]:
     """
     Tests the model in the environment for a given maneuver.
     Returns total reward, average CTE, and average heading error
@@ -67,7 +67,7 @@ def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: i
     return total_rew, sum(cte) / len(cte), sum(heading_error) / len(heading_error), terminations, steps * episodes / sum(inf_time)
     
 if __name__ == "__main__":
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_knuffingen.yaml")
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_simple_layout.yaml")
     env = gym.make("tinycarlo-v2", config=config_path)
 
     obs = pre_obs(env.reset(seed=ENV_SEED)[0]) # seed the environment and get obs shape

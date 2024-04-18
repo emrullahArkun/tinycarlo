@@ -6,6 +6,7 @@ import os
 
 model_urls: Dict[Tuple[int,int,int], str] = {   
     (5,64,160): "http://riege.com.de/tinycarlo/tinycar_combo_5_64_160.pt",
+    (5,128,160): "http://riege.com.de/tinycarlo/tinycar_combo_5_128_160.pt",
 }
 
 DEFAULT_M_DIM = 3

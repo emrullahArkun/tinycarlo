@@ -26,8 +26,8 @@ config = {
     "camera": {
         "position": [0.02, 0, 0.024], # [x,y,z] in m relative to middle of front axle (x: forward, y: right, z: up)
         "orientation": [15, 0, 0], # [pitch,roll,yaw] in degrees
-        "resolution": [480, 640], # [height, width] in pixels
-        "fov": 80, # in degrees
+        "resolution": [240, 320], # [height, width] in pixels
+        "fov": 120, # in degrees
         "max_range": 0.5, # in meters
         "line_thickness": 6 # in pixels
     },
@@ -50,7 +50,7 @@ while True:
     # Lateral Control with Stanley Controller
     steering_correction = math.atan2(k * cte, speed)
     steering_angle = (heading_error + steering_correction) * 180 / math.pi / config["car"]["max_steering_angle"]
-    action = {"car_control": [speed, steering_angle+0.8], "maneuver": 3} # always try to turn left
+    action = {"car_control": [speed, steering_angle], "maneuver": 3} # always try to turn left
     observation, reward, terminated, truncated, info = env.step(action)
     print(reward)
     if terminated or truncated:
