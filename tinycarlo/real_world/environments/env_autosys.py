@@ -1,7 +1,7 @@
 ###### Environment for the autosys research lab environment ######
 # https://autosys-lab.de/platforms/2020h0streetplatform/
 from typing import Dict, Optional, Tuple, Union, Any
-import time, math, socket, struct, threading
+import time, math, socket, struct, threading, cv2, torch, time
 import numpy as np
 from collections import deque
 
@@ -10,6 +10,7 @@ from tinycarlo.car import Car
 from tinycarlo.helper import clip_angle
 
 from tinycar import Tinycar, TinycarTelemetry
+from lanedetection.models.unet import VGG8U
 
 class AutosysCamera(Camera):
     def __init__(self, map, car, renderer, config):
@@ -21,11 +22,28 @@ class AutosysCamera(Camera):
 
         self.last_frame_rgb = None
         self.last_frame_classes = None
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+        self.model = VGG8U(7)
+        self.model.load_pretrained(self.device)
+        self.model.to(self.device)
+        self.model.eval()
     
     def capture_frame(self, format: str) -> np.ndarray:
-        self.last_frame_rgb = np.zeros((self.resolution[0], self.resolution[1], 3), dtype=np.uint8)
-        self.last_frame_classes = np.zeros((len(self.map.get_laneline_names()), self.resolution[0], self.resolution[1]), dtype=np.uint8)
+        image = self.tinycar.getLastImage()
+        if image is not None:
+            st = time.perf_counter()
+            image = np.array(cv2.resize(image, (320,224))/255.0, dtype=np.float32)
+            input = torch.from_numpy(image.transpose(2,0,1)).to(self.device).unsqueeze(0)
+            with torch.no_grad():
+                y = self.model(input)[0].cpu().numpy()
+            #print(f"Capture frame: {(time.perf_counter()-st)*1000:.2f} ms")
+            self.last_frame_rgb = cv2.cvtColor(y[-1], cv2.COLOR_GRAY2BGR)*255
+            self.last_frame_classes = np.stack([cv2.resize(y[i]*255, (self.resolution[1],self.resolution[0])) for i in range(5)], axis=0)
+        else:
+            self.last_frame_rgb = np.zeros((self.resolution[0], self.resolution[1], 3), dtype=np.float32)
+            self.last_frame_classes = np.zeros((5, self.resolution[0], self.resolution[1]), dtype=np.float32)
         return self.last_frame_rgb if format == "rgb" else self.last_frame_classes
+
 
 class CarTracking():
     MCAST_GRP = '239.255.255.250'
@@ -91,17 +109,6 @@ class AutosysCar(Car):
         self.last_velocity_update = None
         self.history = deque(maxlen=50)
         self.velocity = 0.0 
-        # self.pid_integral = 0.0
-        # self.pid_pre_error = 0.0
-        # self.pid_last_time = None
-        # self.pid_kp = 5.0
-        # self.pid_ki = 0.0
-        # self.pid_kd = 10.0
-        # self.x = [0.0]
-        #self.graph = plt.plot(self.x)
-        #plt.ylim(0, 0.5)
-        #plt.draw()
-        #plt.show(block=False)
 
     def step(self, velocity: float, steering_angle: float, maneuver: int) -> bool:
         # steering angle in tinycarlo is -1 to 1, but for tinycar it is in degrees
@@ -127,7 +134,6 @@ class AutosysCar(Car):
             print("Waiting for first tracking data.")
             self.wait_for_tracking_data(timeout=False)
             print("First tracking data received.")
-        
         # automatic repositioning
         desired_position, desired_rotation, nearest_edge = self.map.sample_nearest_edge(self.position, self.rotation)
         self.local_path = [nearest_edge]
@@ -149,7 +155,7 @@ class AutosysCar(Car):
                 steering_correction = math.atan2(4 * cte, self.reset_speed)
                 steering_angle = (heading_error + steering_correction) * 180 / math.pi / self.max_steering_angle
                 steering_angle = np.clip(steering_angle, -1, 1)
-                self.drive(steering_angle, self.reset_speed)
+                self.drive(steering_angle * self.max_steering_angle, self.reset_speed)
 
             # update nearest edge
             desired_position, desired_rotation, nearest_edge = self.map.sample_nearest_edge(self.position, self.rotation)
@@ -162,39 +168,16 @@ class AutosysCar(Car):
         self.last_maneuver = 0
         self.radius = 0.0
         self.last_velocity_update = None
-        # self.pid_integral = 0.0
-        # self.pid_pre_error = 0.0
-        # self.pid_last_time = None
     
     def drive(self, steering_angle, speed):
         """
         Sends a drive command to the car and updates the position and rotation of the car.
         This is a blocking function and waits for the tracking data to be received. If no tracking data is received within the timeout, the car stops.
         """
-        # apply PID
-        # if self.pid_last_time is None:
-        #     self.pid_last_time = time.perf_counter()
-        #     return
-        # dt = time.perf_counter() - self.pid_last_time
-        # self.pid_last_time = time.perf_counter()
-        # error = speed - self.velocity
-        # pout = self.pid_kp * error
-        # self.pid_integral += error * dt
-        # iout = self.pid_ki * self.pid_integral
-        # derivative = (error - self.pid_pre_error) / dt
-        # dout = self.pid_kd * derivative
-        # self.pid_pre_error = error
-        # set_speed = pout + iout + dout
-        # set_speed = np.clip(set_speed, 0, 1.0)
-
-       #print(self.velocity, error)
-        #self.x.append(self.velocity)
-        #plt.clf()
-        #plt.plot(self.x)
-        #plt.draw()
-
+        # get out of the way if we are stuck
         if self.velocity < 0.01:
             speed *= 2.5
+
         speed = np.clip(speed, -1.0, 1.0)
         self.tinycar.setServoAngle(int(9000 + steering_angle * 100))
         self.tinycar.setMotorDutyCycle(int(speed * 100))
@@ -205,8 +188,13 @@ class AutosysCar(Car):
     
     def wait_for_tracking_data(self, timeout: bool = True) -> bool:
         st = time.perf_counter()
-        while (tracking_data := self.tracking.get_tracking_data()) is None and (time.perf_counter() - st < self.drive_tracking_timeout or not timeout):
-            pass
+        try:
+            while (tracking_data := self.tracking.get_tracking_data()) is None and (time.perf_counter() - st < self.drive_tracking_timeout or not timeout):
+                pass
+        except KeyboardInterrupt:
+            self.tinycar.setMotorDutyCycle(0)
+            self.tracking.stop()
+            exit(0)
         if tracking_data is None:
             return False
         x = tracking_data[0] / self.map.pixel_per_meter

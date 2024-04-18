@@ -3,13 +3,8 @@ import tinycarlo
 import os
 import math
 
-<<<<<<< HEAD
 from tinycarlo.wrapper.reward import CTESparseRewardWrapper
 from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper, CTETerminationWrapper
-=======
-from tinycarlo.wrapper.reward import CTELinearRewardWrapper
-from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper
->>>>>>> 5062db3a76cbd5fff4e0b1e7cf46cea03cc66146
 
 config = {
     "sim": {
@@ -26,7 +21,7 @@ config = {
         "steering_speed": 30, # in deg/s
         "max_acceleration": 0.1, # in m/s^2
         "max_deceleration": 1, # in m/s^2
-        "tinycar_hostname": "192.168.84.43",
+        "tinycar_hostname": "192.168.84.49",
     },
     "camera": {
         "position": [0.02, 0, 0.024], # [x,y,z] in m relative to middle of front axle (x: forward, y: right, z: up)
@@ -41,6 +36,7 @@ config = {
         "pixel_per_meter": 450 # 222
     }
 }
+
 env = gym.make("tinycarlo-realworld-v2", config=config, render_mode="human")
 env = CTESparseRewardWrapper(env, 0.01)
 env = CTETerminationWrapper(env, 0.07, number_of_steps=5)
@@ -50,15 +46,19 @@ speed = 0.4
 
 observation, info = env.reset(seed=2)
 
+import time
+
 while True:
+    st = time.perf_counter()
     cte, heading_error = info["cte"], info["heading_error"]
     # Lateral Control with Stanley Controller
     steering_correction = math.atan2(k * cte, speed)
     steering_angle = (heading_error + steering_correction) * 180 / math.pi / config["car"]["max_steering_angle"]
     action = {"car_control": [speed, steering_angle], "maneuver": 3} # always try to turn left
     observation, reward, terminated, truncated, info = env.step(action)
-    print(reward)
     if terminated or truncated:
         observation, info = env.reset()
+        print("Resetting the environment.")
+    print(f"steps/s: {1/(time.perf_counter()-st):.2f}", end="\r")
 
 env.close()
