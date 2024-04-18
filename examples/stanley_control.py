@@ -41,15 +41,9 @@ config = {
         "pixel_per_meter": 450 # 222
     }
 }
-<<<<<<< HEAD
 env = gym.make("tinycarlo-realworld-v2", config=config, render_mode="human")
 env = CTESparseRewardWrapper(env, 0.01)
 env = CTETerminationWrapper(env, 0.07, number_of_steps=5)
-=======
-env = gym.make("tinycarlo-v2", config=config, render_mode="human")
-#env = CTESparseRewardWrapper(env, 0.01)
-env = CTELinearRewardWrapper(env, min_cte=0.04, max_reward=1.0, min_reward=-3.0)
->>>>>>> 5062db3a76cbd5fff4e0b1e7cf46cea03cc66146
 
 k = 4
 speed = 0.4
