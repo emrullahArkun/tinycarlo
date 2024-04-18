@@ -1,6 +1,6 @@
 import gymnasium as gym
 from typing import Tuple
-from tinycarlo.wrapper import CTELinearRewardWrapper, LanelineSparseRewardWrapper, CTETerminationWrapper
+from tinycarlo.wrapper import CTELinearRewardWrapper, LanelineSparseRewardWrapper, CTETerminationWrapper, CrashTerminationWrapper
 import tinycarlo
 from tinycarlo.helper import getenv
 
@@ -34,6 +34,7 @@ def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: i
     env = CTELinearRewardWrapper(unwrapped_env, min_cte=0.03, max_reward=1.0)
     env = LanelineSparseRewardWrapper(env, sparse_rewards={"outer": -10.0})
     env = CTETerminationWrapper(env, max_cte=0.1, number_of_steps=5)
+    env = CrashTerminationWrapper(env)
 
     def get_steering_angle(x, m, seq_x):
         with torch.no_grad():

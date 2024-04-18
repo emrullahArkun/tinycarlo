@@ -151,7 +151,7 @@ class AutosysCar(Car):
                     # local path terminates, try different maneuver
                     if self.find_local_path(3, looking_ahead=10):
                         break
-                cte, heading_error, _, _ = self.get_info()
+                cte, heading_error, _, _, _ = self.get_info()
                 steering_correction = math.atan2(4 * cte, self.reset_speed)
                 steering_angle = (heading_error + steering_correction) * 180 / math.pi / self.max_steering_angle
                 steering_angle = np.clip(steering_angle, -1, 1)

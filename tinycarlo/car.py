@@ -44,7 +44,7 @@ class Car():
         self.last_maneuver = 0
 
     def get_info(self) -> Tuple[float, float, Dict[str, float], List[Node]]:
-        empty_info = 0, 0, {layer_name: 0 for layer_name in self.map.get_laneline_names()}, []
+        empty_info = 0, 0, {layer_name: 0 for layer_name in self.map.get_laneline_names()}, [], 0.0
 
         # calculate heading and cross track error by first updating nearest edge and next edge
         if self.local_path is None or len(self.local_path) < 2:
@@ -65,7 +65,7 @@ class Car():
         # set local path for reference tracking. Instead of having a list of edges we want to have a list of coordinates
         local_path_coordinates = [self.map.lanepath.nodes[edge[1]] for edge in self.local_path]
 
-        return cte, heading_error, distances, local_path_coordinates
+        return cte, heading_error, distances, local_path_coordinates, self.velocity
 
     def step(self, velocity: float, steering_angle: float, maneuver: int) -> bool:
         """

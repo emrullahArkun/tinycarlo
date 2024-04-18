@@ -4,7 +4,7 @@ import os
 import math
 
 from tinycarlo.wrapper.reward import CTESparseRewardWrapper
-from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper, CTETerminationWrapper
+from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper, CTETerminationWrapper, CrashTerminationWrapper
 
 config = {
     "sim": {
@@ -40,6 +40,7 @@ config = {
 env = gym.make("tinycarlo-realworld-v2", config=config, render_mode="human")
 env = CTESparseRewardWrapper(env, 0.01)
 env = CTETerminationWrapper(env, 0.07, number_of_steps=5)
+env = CrashTerminationWrapper(env)
 
 k = 4
 speed = 0.4

@@ -81,8 +81,8 @@ class TinyCarloEnv(gym.Env):
             return np.zeros(self.observation_space.shape, dtype=np.uint8)
     
     def __get_info(self) -> Dict[str, Any]:
-        cte, heading_error, distances, local_path = self.car.get_info()
-        return {"cte": cte, "heading_error": heading_error, "position": self.car.position, "orientation": self.car.rotation, "laneline_distances": distances, "local_path": local_path}
+        cte, heading_error, distances, local_path, velocity = self.car.get_info()
+        return {"cte": cte, "heading_error": heading_error, "position": self.car.position, "orientation": self.car.rotation, "laneline_distances": distances, "local_path": local_path, "velocity": velocity}
     
     def __default_reward(self, cte: float) -> float: 
         """
