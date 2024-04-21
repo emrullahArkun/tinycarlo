@@ -1,6 +1,6 @@
 import gymnasium as gym
 from typing import Tuple
-from tinycarlo.wrapper import CTELinearRewardWrapper, LanelineSparseRewardWrapper, CTETerminationWrapper
+from tinycarlo.wrapper import CTELinearRewardWrapper, LanelineSparseRewardWrapper, CTETerminationWrapper, CrashTerminationWrapper
 import tinycarlo
 from tinycarlo.helper import getenv
 
@@ -30,7 +30,8 @@ def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: i
     model.eval()
 
     env = CTELinearRewardWrapper(unwrapped_env, min_cte=0.03, max_reward=1.0, min_reward=-1.0)
-    env = CTETerminationWrapper(env, max_cte=0.1)
+    env = CTETerminationWrapper(env, max_cte=0.1, number_of_steps=5)
+    env = CrashTerminationWrapper(env)
 
     def get_steering_angle(x, m, seq_x):
         with torch.no_grad():
@@ -41,7 +42,6 @@ def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: i
             else:
                 out = model.forward(x.unsqueeze(0), m)[0].cpu().item()
         return out
-
     obs = env.reset(seed=seed)[0]
     total_rew, cte, heading_error, terminations, inf_time, positions = 0.0, [], [], 0, [], []
     terminated, truncated = False, False
@@ -68,8 +68,8 @@ def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: i
     return total_rew, sum(cte) / len(cte), sum(heading_error) / len(heading_error), terminations, steps * episodes / sum(inf_time)
     
 if __name__ == "__main__":
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_simple_layout.yaml")
-    env = gym.make("tinycarlo-v2", config=config_path)
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config_simple_layout.yaml")
+    env = gym.make("tinycarlo-realworld-v2", config=config_path, render_mode="human")
 
     obs = pre_obs(env.reset(seed=ENV_SEED)[0]) # seed the environment and get obs shape
 
@@ -78,13 +78,13 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         if ACTOR:
             actor = TinycarActorTemporal(seq_len=10) if TEMPORAL else TinycarActor()
-            actor.load_state_dict(torch.load(sys.argv[1]), strict=False)
+            actor.load_state_dict(torch.load(sys.argv[1], map_location=device), strict=False)
             tinycar_combo.actor = actor
         else:
-            tinycar_combo.load_state_dict(torch.load(sys.argv[1]), strict=False)
+            tinycar_combo.load_state_dict(torch.load(sys.argv[1], map_location=device), strict=False)
 
     for maneuver in range(3):
-        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, steps=2000, episodes=1, render_mode="human", temporal=10 if TEMPORAL else 1, seed=ENV_SEED)
+        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, steps=2000, episodes=5, render_mode="human", temporal=10 if TEMPORAL else 1, seed=ENV_SEED)
         print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte:.4f} m/step | Heading Error: {heading_error:.4f} rad/step | Terminations: {terminations:3d} | perf: {stepss:.2f} steps/s")
     
 
