@@ -18,8 +18,6 @@ ACTOR = getenv("ACTOR") # if set, pretrained tinycombo is loaded and the provide
 TEMPORAL = getenv("TEMPORAL") # if set, actor is TinycarActorTemporal
 
 def pre_obs(obs: np.ndarray) -> np.ndarray:
-    # cropping and normalizing the image
-    #return np.stack([obs[i,obs.shape[1]//2:,:]/255 for i in range(obs.shape[0])], axis=0).astype(np.float32)
     return (obs/255).astype(np.float32)
 
 def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: int = 0, speed = 0.4, steps = 5000, episodes = 5, render_mode=None, temporal: int = 1) -> Tuple[float, float, float, int, float]:
@@ -31,8 +29,7 @@ def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: i
     model.to(device)
     model.eval()
 
-    env = CTELinearRewardWrapper(unwrapped_env, min_cte=0.03, max_reward=1.0)
-    env = LanelineSparseRewardWrapper(env, sparse_rewards={"outer": -10.0})
+    env = CTELinearRewardWrapper(unwrapped_env, min_cte=0.03, max_reward=1.0, min_reward=-1.0)
     env = CTETerminationWrapper(env, max_cte=0.1, number_of_steps=5)
     env = CrashTerminationWrapper(env)
 
@@ -46,7 +43,7 @@ def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: i
                 out = model.forward(x.unsqueeze(0), m)[0].cpu().item()
         return out
     obs = env.reset(seed=seed)[0]
-    total_rew, cte, heading_error, terminations, inf_time = 0.0, [], [], 0, []
+    total_rew, cte, heading_error, terminations, inf_time, positions = 0.0, [], [], 0, [], []
     terminated, truncated = False, False
     seq_x = torch.zeros(temporal, TinycarEncoder.FEATURE_VEC_SIZE).to(device)
     for i in range(int(steps * episodes)):
@@ -59,11 +56,15 @@ def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: i
         total_rew += rew
         cte.append(abs(info["cte"]))
         heading_error.append(abs(info["heading_error"]))
+        positions.append(info["position"])
         if terminated or truncated:
-            terminations += 1
+            if terminated:
+                terminations += 1
             obs = env.reset()[0]
         if i % steps == 0:
             obs = env.reset()[0]
+    # save positions for visualization in examples/render_map.py
+    np.save(f"/tmp/positions_m{maneuver}.npy", np.array(positions))
     return total_rew, sum(cte) / len(cte), sum(heading_error) / len(heading_error), terminations, steps * episodes / sum(inf_time)
     
 if __name__ == "__main__":
@@ -83,7 +84,7 @@ if __name__ == "__main__":
             tinycar_combo.load_state_dict(torch.load(sys.argv[1], map_location=device), strict=False)
 
     for maneuver in range(3):
-        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, steps=4000, episodes=1, render_mode="human", temporal=10 if TEMPORAL else 1, seed=ENV_SEED)
+        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, steps=2000, episodes=5, render_mode="human", temporal=10 if TEMPORAL else 1, seed=ENV_SEED)
         print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte:.4f} m/step | Heading Error: {heading_error:.4f} rad/step | Terminations: {terminations:3d} | perf: {stepss:.2f} steps/s")
     
 

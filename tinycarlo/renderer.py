@@ -65,8 +65,12 @@ class Renderer():
         
          # render car paths
         path = self.map.get_lanepath()
+        line_path_color = (50,50,50) 
+        if self.background_color is not None:
+            if sorted(self.background_color) != sorted((255,255,255)):
+                line_path_color = (200,200,200)
         for line in path:
-            overview = cv2.polylines(overview, self.__scale_points(line), False, (50,50,50), self.line_thickness)
+            overview = cv2.polylines(overview, self.__scale_points(line), False, line_path_color, self.line_thickness)
         
         # render lane path node names
         if node_names:

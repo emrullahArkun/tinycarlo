@@ -82,7 +82,7 @@ class TinyCarloEnv(gym.Env):
     
     def __get_info(self) -> Dict[str, Any]:
         cte, heading_error, distances, local_path, velocity = self.car.get_info()
-        return {"cte": cte, "heading_error": heading_error, "position": self.car.position, "orientation": self.car.rotation, "laneline_distances": distances, "local_path": local_path, "velocity": velocity}
+        return {"cte": cte, "heading_error": heading_error, "position": self.car.position.copy(), "orientation": self.car.rotation, "laneline_distances": distances, "local_path": local_path, "velocity": velocity}
     
     def __default_reward(self, cte: float) -> float: 
         """
@@ -117,7 +117,7 @@ class TinyCarloEnv(gym.Env):
         # clip car_control to action space
         car_control: np.ndarray = np.clip(action["car_control"], self.action_space["car_control"].low, self.action_space["car_control"].high)
         st_step: float = time.perf_counter()
-        car_termination = self.car.step(car_control[0], car_control[1], action["maneuver"])
+        car_truncated = self.car.step(car_control[0], car_control[1], action["maneuver"])
         td_step: float = time.perf_counter() - st_step
 
         st_obs: float = time.perf_counter()
@@ -144,7 +144,7 @@ class TinyCarloEnv(gym.Env):
         if getenv("DEBUG"):
             print(f"all: {(time.perf_counter() - st)*1000:.2f} ms | obs render {td_obs*1000:.2f} ms | info {td_info*1000:.2f} ms | car step {td_step*1000:.2f} ms")
 
-        return observation, reward, terminated or car_termination, False, info
+        return observation, reward, terminated, car_truncated, info
 
     def render(self) -> Optional[np.ndarray]:
         if self.render_mode == "rgb_array":
