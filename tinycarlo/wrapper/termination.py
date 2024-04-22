@@ -48,7 +48,7 @@ class CTETerminationWrapper(Wrapper):
         return observation, reward, terminated, truncated, info
     
 class CrashTerminationWrapper(Wrapper):
-    def __init__(self, env: Env, velcoity_threshold: float = 0.006, number_of_steps: int = 10):
+    def __init__(self, env: Env, velcoity_threshold: float = 0.005, number_of_steps: int = 10):
         """
         Wrapper class for terminating the environment when the car crashes. A crash is detected when the car's velocity is below a certain threshold for a certain number of steps. Only useful when using a real world environment.
         """

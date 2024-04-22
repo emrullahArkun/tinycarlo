@@ -160,7 +160,7 @@ class AutosysCar(Car):
             # update nearest edge
             desired_position, desired_rotation, nearest_edge = self.map.sample_nearest_edge(self.position, self.rotation)
         # arrived nearly at the desired position
-        print("Arrived at desired position.")
+        #print("Arrived at desired position.")
         self.tinycar.setBlinkerOff()
         self.local_path = [nearest_edge]
         self.steering_angle = 0.0
