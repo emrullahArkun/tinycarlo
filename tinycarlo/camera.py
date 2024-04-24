@@ -108,7 +108,6 @@ class Camera():
         
         if getenv("DEBUG"):
             print(f"obs render: {(time.perf_counter()-st_render)*1000:.4f} ms")
-        #cv2.imwrite("frame_sim.png", self.last_frame_rgb)
         return self.last_frame_rgb if format == "rgb" else self.last_frame_classes
 
     def __point_on_line_at_z(self, p0: np.ndarray, p1: np.ndarray, target_z: float = -0.00001) -> Optional[np.ndarray]:
