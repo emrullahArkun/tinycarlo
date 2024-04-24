@@ -11,10 +11,10 @@ car:
   steering_speed: 30 # deg/s
   max_acceleration: 0.1 # m/s^2
   max_deceleration: 1.0 # m/s^2
-  tinycar_hostname: '192.168.84.49' # example of autosys real world env specific param. Will be ignored if using standard tinycarlo
+  tinycar_hostname: '192.168.84.63' # example of autosys real world env specific param. Will be ignored if using standard tinycarlo
 camera:
-  position: [0.02,0,0.024] # [x,y,z] in m relative to middle of front axle (x: forward, y: right, z: up)
-  orientation: [15,0,0] # [pitch,roll,yaw] in degrees
+  position: [0.02,-0.01,0.022] # [x,y,z] in m relative to middle of front axle (x: forward, y: right, z: up)
+  orientation: [25,0,0] # [pitch,roll,yaw] in degrees
   resolution: [128,160] # [height, width] in px
   fov: 120 # in degrees
   max_range: 0.5 # in m (can be None for infinite range)
