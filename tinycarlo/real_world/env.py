@@ -24,6 +24,7 @@ class TinyCarloRealWorldEnv(TinyCarloEnv):
         self.car = self.__get_car_dyn(modules)(self.T, self.map, self.config["car"])
         self.renderer = Renderer(self.map, self.car, self.overview_pixel_per_meter)
         self.camera = self.__get_camera_dyn(modules)(self.map, self.car, self.renderer, self.config["camera"])
+        #self.camera = Camera(self.map, self.car, self.renderer, self.config["camera"])
         self.reset()
         
 

@@ -7,10 +7,12 @@ from collections import deque
 
 from tinycarlo.camera import Camera
 from tinycarlo.car import Car
-from tinycarlo.helper import clip_angle
+from tinycarlo.helper import clip_angle, getenv
 
 from tinycar import Tinycar, TinycarTelemetry
 from lanedetection.models.unet import VGG8U
+
+RAW = getenv("RAW")
 
 class AutosysCamera(Camera):
     def __init__(self, map, car, renderer, config):
@@ -32,13 +34,18 @@ class AutosysCamera(Camera):
         image = self.tinycar.getLastImage()
         if image is not None:
             st = time.perf_counter()
-            image = np.array(cv2.resize(image, (320,224))/255.0, dtype=np.float32)
-            input = torch.from_numpy(image.transpose(2,0,1)).to(self.device).unsqueeze(0)
-            with torch.no_grad():
-                y = self.model(input)[0].cpu().numpy()
-            #print(f"Capture frame: {(time.perf_counter()-st)*1000:.2f} ms")
-            self.last_frame_rgb = cv2.cvtColor(y[-1], cv2.COLOR_GRAY2BGR)*255
-            self.last_frame_classes = np.stack([cv2.resize(y[i]*255, (self.resolution[1],self.resolution[0])) for i in range(5)], axis=0)
+            image = np.array(cv2.resize(image, (320,224))/255.0, dtype=np.float32).transpose(2,0,1)
+            if RAW:
+                self.last_frame_rgb = cv2.resize(image.transpose(1,2,0), (self.resolution[1],self.resolution[0]))
+                cv2.imwrite("frame.png", self.last_frame_rgb*255)
+                self.last_frame_classes = np.stack([cv2.resize(image[i]*255, (self.resolution[1],self.resolution[0])) for i in range(3)], axis=0)
+            else:
+                input = torch.from_numpy(image).to(self.device).unsqueeze(0)
+                with torch.no_grad():
+                    y = self.model(input)[0].cpu().numpy()
+                #print(f"Capture frame: {(time.perf_counter()-st)*1000:.2f} ms")
+                self.last_frame_rgb = cv2.cvtColor(y[-1], cv2.COLOR_GRAY2BGR)*255
+                self.last_frame_classes = np.stack([cv2.resize(y[i]*255, (self.resolution[1],self.resolution[0])) for i in range(5)], axis=0)
         else:
             self.last_frame_rgb = np.zeros((self.resolution[0], self.resolution[1], 3), dtype=np.float32)
             self.last_frame_classes = np.zeros((5, self.resolution[0], self.resolution[1]), dtype=np.float32)
@@ -100,6 +107,7 @@ class AutosysCar(Car):
         self.tinycar_hostname = config.get('tinycar_hostname', 'localhost')
         self.tinycar = Tinycar(self.tinycar_hostname)
         self.position_check_thres = 0.02
+        self.rotation_check_thres = math.radians(20)
         self.reset_speed = 0.3
         self.tracking = CarTracking()
         self.tracking.start()
@@ -107,7 +115,7 @@ class AutosysCar(Car):
         self.position = None
         self.rotation = None
         self.last_velocity_update = None
-        self.history = deque(maxlen=50)
+        self.history = deque(maxlen=20)
         self.velocity = 0.0 
 
     def step(self, velocity: float, steering_angle: float, maneuver: int) -> bool:
@@ -137,7 +145,7 @@ class AutosysCar(Car):
         # automatic repositioning
         desired_position, desired_rotation, nearest_edge = self.map.sample_nearest_edge(self.position, self.rotation)
         self.local_path = [nearest_edge]
-        while not self.check_position(desired_position):
+        while not self.check_position(desired_position) or not self.check_rotation(desired_rotation):
             self.tinycar.setBlinkerHazard()
             # check if we have a history
             if len(self.history) > 0:
@@ -162,6 +170,8 @@ class AutosysCar(Car):
         # arrived nearly at the desired position
         #print("Arrived at desired position.")
         self.tinycar.setBlinkerOff()
+        self.tinycar.setMotorDutyCycle(0)
+        self.tinycar.setServoAngle(9000)
         self.local_path = [nearest_edge]
         self.steering_angle = 0.0
         self.velocity = 0.0
@@ -200,7 +210,7 @@ class AutosysCar(Car):
         x = tracking_data[0] / self.map.pixel_per_meter
         y = tracking_data[1] / self.map.pixel_per_meter
         self.update_velocity((x, y))
-        self.position = (x, y)
+        self.position = [x, y]
         self.rotation = clip_angle(tracking_data[2])
         self.update_position_front()
         return True
@@ -215,6 +225,9 @@ class AutosysCar(Car):
 
     def check_position(self, desired_position):
         return self.position[0] >= desired_position[0] - self.position_check_thres and self.position[0] <= desired_position[0] + self.position_check_thres and self.position[1] >= desired_position[1] - self.position_check_thres and self.position[1] <= desired_position[1] + self.position_check_thres
+    
+    def check_rotation(self, desired_rotation):
+        return abs(clip_angle(desired_rotation-self.rotation)) < self.rotation_check_thres
 
 
 
