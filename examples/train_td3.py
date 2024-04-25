@@ -4,13 +4,13 @@ from typing import Tuple, List
 import torch
 import torch.nn.functional as F
 
-import os
+import os, sys
 import numpy as np
 from tqdm import trange
 import time
 
 from tinycarlo.wrapper.reward import CTELinearRewardWrapper, LanelineSparseRewardWrapper
-from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper, CTETerminationWrapper
+from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper, CTETerminationWrapper, CrashTerminationWrapper
 from examples.models.tinycar_net import TinycarActorTemporal, TinycarCriticTemporal, TinycarCombo, TinycarEncoder
 from examples.benchmark_tinycar_net import pre_obs, evaluate
 from tinycarlo.helper import getenv
@@ -25,10 +25,10 @@ EPISODES = 1000
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
-MAX_STEPS = 2000
+MAX_STEPS = 1000
 
 # *** environment parameters ***
-SPEED = 0.5
+SPEED = 0.4
 
 NOISE_THETA = 0.1
 NOISE_MEAN = 0.0
@@ -37,15 +37,17 @@ NOISE_SIGMA = 0.4
 SEQ_LEN = 10
 
 MODEL_SAVEFILE = "/tmp/actor_td3.pt"
+PRETRAINED_MODEL = sys.argv[1] if len(sys.argv) > 1 else None
 
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
 if __name__ == "__main__":
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_simple_layout.yaml")
-    env = gym.make("tinycarlo-v2", config=config_path)
+    env = gym.make("tinycarlo-realworld-v2", config=config_path)
 
     env = CTELinearRewardWrapper(env, min_cte=0.03, max_reward=1.0, min_reward=-1.0)
-    env = CTETerminationWrapper(env, max_cte=0.15)
+    env = CTETerminationWrapper(env, max_cte=0.1, number_of_steps=5)
+    env = CrashTerminationWrapper(env)
 
     obs = pre_obs(env.reset()[0])  # seed the environment and get obs shape
     tinycar_combo = TinycarCombo(obs.shape)
@@ -53,6 +55,8 @@ if __name__ == "__main__":
     encoder = tinycar_combo.encoder
     actor = TinycarActorTemporal(seq_len=SEQ_LEN)
     actor_target = TinycarActorTemporal(seq_len=SEQ_LEN)
+    if PRETRAINED_MODEL:
+        actor.load_state_dict(torch.load(PRETRAINED_MODEL, map_location=device))
     critic1 = TinycarCriticTemporal(seq_len=SEQ_LEN)
     critic2 = TinycarCriticTemporal(seq_len=SEQ_LEN)
     critic_target1 = TinycarCriticTemporal(seq_len=SEQ_LEN)
@@ -165,10 +169,11 @@ if __name__ == "__main__":
             t.set_description(f"sz: {replay_buffer.rp_sz:5d} | steps/s: {steps / (time.perf_counter() - st):.2f} | rew/ep {avg_w(rews, 10):3.2f}| c1 loss: {avg_w(c1_loss):3.3f} | c2 loss: {avg_w(c2_loss):3.3f} | actor loss: {avg_w(a_loss):3.3f}")
             if terminated or truncated:
                 break
+        env.reset()
         rews.append(ep_rew)
+        torch.save(actor.state_dict(), MODEL_SAVEFILE)
 
-    print(f"Saving model to: {MODEL_SAVEFILE}")
-    torch.save(actor.state_dict(), MODEL_SAVEFILE)
+    print(f"Saved model to: {MODEL_SAVEFILE}")
 
     create_critic_loss_graph(c1_loss, c2_loss)
     create_action_loss_graph(a_loss)
@@ -177,5 +182,6 @@ if __name__ == "__main__":
     print("Evaluating:")
     tinycar_combo.actor = actor
     for maneuver in range(3):
-        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env.unwrapped, maneuver=maneuver,render_mode=None, steps=2000, episodes=5, temporal=SEQ_LEN)
-        print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte:.4f} m/step | H-Error: {heading_error:.4f} rad/step | Terms: {terminations:3d} | perf: {stepss:.2f} steps/s")
+        eval_dict = evaluate(tinycar_combo, env.unwrapped, maneuver=maneuver, steps=1000, episodes=5, render_mode=None, temporal=SEQ_LEN)
+        cte_avg, cte_var, heading_error_avg, heading_error_var, terminations, steps_per_s, rew = eval_dict["cte_avg"], eval_dict["cte_var"], eval_dict["heading_error_avg"], eval_dict["heading_error_var"], eval_dict["terminations"], eval_dict["steps_per_s"], eval_dict["total_reward"] 
+        print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte_avg:.4f} m/step var: {cte_var:.4f}| Heading Error: {heading_error_avg:.4f} rad/step var {heading_error_var:.4f} | Terminations: {terminations:3d} | perf: {steps_per_s:.2f} steps/s")
