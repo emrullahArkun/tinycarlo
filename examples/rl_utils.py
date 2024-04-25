@@ -43,6 +43,14 @@ class ReplaybufferTemporal:
         assert self.rp_sz >= self.batch_size
         x, m, a, r, x1, m1 = self[np.random.randint(0, self.rp_sz, self.batch_size)]
         return torch.from_numpy(x).to(device), F.one_hot(torch.from_numpy(m), self.maneuver_dim).float().to(device), torch.from_numpy(a).to(device), torch.from_numpy(r).to(device), torch.from_numpy(x1).to(device), F.one_hot(torch.from_numpy(m1), self.maneuver_dim).float().to(device)
+    
+    def save_to_disk(self, filename: str) -> None:
+        np.savez_compressed(filename, X=self.X, M=self.M, A=self.A, R=self.R, X1=self.X1)
+
+    def load_from_disk(self, filename: str) -> None:
+        data = np.load(filename)
+        self.X, self.M, self.A, self.R, self.X1 = data["X"], data["M"], data["A"], data["R"], data["X1"]
+        self.rp_sz = self.X.shape[0]
 
     def __getitem__(self, indices):
         return self.X[indices], self.M[indices], self.A[indices], self.R[indices], self.X1[indices], self.M[indices]

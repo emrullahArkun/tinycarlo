@@ -29,7 +29,6 @@ class AutosysCamera(Camera):
         self.model.load_pretrained(self.device)
         self.model.to(self.device)
         self.model.eval()
-    
     def capture_frame(self, format: str) -> np.ndarray:
         image = self.tinycar.getLastImage()
         if image is not None:
@@ -37,7 +36,6 @@ class AutosysCamera(Camera):
             image = np.array(cv2.resize(image, (320,224))/255.0, dtype=np.float32).transpose(2,0,1)
             if RAW:
                 self.last_frame_rgb = cv2.resize(image.transpose(1,2,0), (self.resolution[1],self.resolution[0]))
-                cv2.imwrite("frame.png", self.last_frame_rgb*255)
                 self.last_frame_classes = np.stack([cv2.resize(image[i]*255, (self.resolution[1],self.resolution[0])) for i in range(3)], axis=0)
             else:
                 input = torch.from_numpy(image).to(self.device).unsqueeze(0)
@@ -108,7 +106,7 @@ class AutosysCar(Car):
         self.tinycar = Tinycar(self.tinycar_hostname)
         self.position_check_thres = 0.02
         self.rotation_check_thres = math.radians(20)
-        self.reset_speed = 0.3
+        self.reset_speed = 0.35
         self.tracking = CarTracking()
         self.tracking.start()
         self.drive_tracking_timeout = 0.5

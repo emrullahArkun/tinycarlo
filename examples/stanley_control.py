@@ -21,7 +21,7 @@ config = {
         "steering_speed": 30, # in deg/s
         "max_acceleration": 0.1, # in m/s^2
         "max_deceleration": 1, # in m/s^2
-        "tinycar_hostname": "192.168.84.63",
+        "tinycar_hostname": "192.168.84.70",
     },
     "camera": {
         "position": [0.0, -0.005, 0.04], # [x,y,z] in m relative to middle of front axle (x: forward, y: right, z: up)

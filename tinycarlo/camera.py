@@ -13,7 +13,7 @@ class Camera():
         self.map: Map = map
         self.car: Car = car
         self.renderer: Renderer = renderer
-        self.resolution: Tuple[int, int] = camera_config.get('resolution', [128, 128])
+        self.resolution: Tuple[int, int] = camera_config.get('resolution', [128, 160])
         self.position: Tuple[float, float, float] = camera_config.get('position', [0, 0, 0])
         self.orientation: Tuple[int, int, int] = camera_config.get('orientation', [0,0,0])
         self.fov: int = camera_config.get('fov', 90)
@@ -25,7 +25,6 @@ class Camera():
 
         self.last_frame_rgb: Optional[np.ndarray] = None
         self.last_frame_classes: Optional[np.ndarray] = None
-    
     ######## 
     # For Visualisation
     
@@ -110,7 +109,7 @@ class Camera():
             print(f"obs render: {(time.perf_counter()-st_render)*1000:.4f} ms")
         return self.last_frame_rgb if format == "rgb" else self.last_frame_classes
 
-    def __point_on_line_at_z(self, p0: np.ndarray, p1: np.ndarray, target_z: float = -0.00001) -> Optional[np.ndarray]:
+    def __point_on_line_at_z(self, p0: np.ndarray, p1: np.ndarray, target_z: float = -0.0000001) -> Optional[np.ndarray]:
         """
         In 3D camera frame, an edge can go through the camera. This function returns a point on the line at z = 0, 
         so the edge can correctly be projected to the image plane.
@@ -174,6 +173,6 @@ class Camera():
         Returns the focal lengths from the field of view and resolution.
         """
         fov_radians = np.radians(fov_deg)
-        fx = resolution[0] / (2 * np.tan(fov_radians / 2))
-        fy = resolution[1] / (2 * np.tan(fov_radians / 2))
+        fx = resolution[1] / (2 * np.tan(fov_radians / 2))
+        fy = resolution[0] / (2 * np.tan(fov_radians / 2))
         return fx, fy
