@@ -137,7 +137,8 @@ if __name__ == "__main__":
     torch.save(tinycar_combo.state_dict(), MODEL_SAVEFILE)
     print("Evaluating:")
     for maneuver in range(3):
-        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, render_mode=None, steps=2000, episodes=5)
-        print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte:.4f} m/step | H-Error: {heading_error:.4f} rad/step | Terms: {terminations:3d} | perf: {stepss:.2f} steps/s")
+        eval_dict = evaluate(tinycar_combo, env.unwrapped, maneuver=maneuver, steps=1000, episodes=5, render_mode=None)
+        cte_avg, cte_var, heading_error_avg, heading_error_var, terminations, steps_per_s, rew = eval_dict["cte_avg"], eval_dict["cte_var"], eval_dict["heading_error_avg"], eval_dict["heading_error_var"], eval_dict["terminations"], eval_dict["steps_per_s"], eval_dict["total_reward"] 
+        print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte_avg:.4f} m/step var: {cte_var:.4f}| Heading Error: {heading_error_avg:.4f} rad/step var {heading_error_var:.4f} | Terminations: {terminations:3d} | perf: {steps_per_s:.2f} steps/s")
 
 

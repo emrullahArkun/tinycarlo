@@ -65,7 +65,15 @@ def evaluate(model: TinycarCombo, unwrapped_env: gym.Env, maneuver: int, seed: i
             obs = env.reset()[0]
     # save positions for visualization in examples/render_map.py
     np.save(f"/tmp/positions_m{maneuver}.npy", np.array(positions))
-    return total_rew, sum(cte) / len(cte), sum(heading_error) / len(heading_error), terminations, steps * episodes / sum(inf_time)
+    np.save(f"/tmp/cte_m{maneuver}.npy", np.array(cte))
+    np.save(f"/tmp/heading_error_m{maneuver}.npy", np.array(heading_error))
+
+    cte_avg = sum(cte) / len(cte)
+    cte_var = sum((x - cte_avg) ** 2 for x in cte) / len(cte)
+    heading_error_avg = sum(heading_error) / len(heading_error)
+    heading_error_var = sum((x - heading_error_avg) ** 2 for x in heading_error) / len(heading_error)
+    ret = {"cte_avg": cte_avg, "cte_var": cte_var, "heading_error_avg": heading_error_avg, "heading_error_var": heading_error_var, "terminations": terminations, "steps_per_s": steps * episodes / sum(inf_time), "total_reward": total_rew}
+    return ret
     
 if __name__ == "__main__":
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config_simple_layout.yaml")
@@ -84,8 +92,9 @@ if __name__ == "__main__":
             tinycar_combo.load_state_dict(torch.load(sys.argv[1], map_location=device), strict=False)
 
     for maneuver in range(3):
-        rew, cte, heading_error, terminations, stepss = evaluate(tinycar_combo, env, maneuver=maneuver, steps=1000, episodes=5, render_mode=None, temporal=10 if TEMPORAL else 1, seed=ENV_SEED)
-        print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte:.4f} m/step | Heading Error: {heading_error:.4f} rad/step | Terminations: {terminations:3d} | perf: {stepss:.2f} steps/s")
+        eval_dict = evaluate(tinycar_combo, env, maneuver=maneuver, steps=1000, episodes=5, render_mode=None, temporal=10 if TEMPORAL else 1, seed=ENV_SEED)
+        cte_avg, cte_var, heading_error_avg, heading_error_var, terminations, steps_per_s, rew = eval_dict["cte_avg"], eval_dict["cte_var"], eval_dict["heading_error_avg"], eval_dict["heading_error_var"], eval_dict["terminations"], eval_dict["steps_per_s"], eval_dict["total_reward"] 
+        print(f"Maneuver {maneuver} -> Total reward: {rew:.2f} | CTE: {cte_avg:.4f} m/step var: {cte_var:.4f}| Heading Error: {heading_error_avg:.4f} rad/step var {heading_error_var:.4f} | Terminations: {terminations:3d} | perf: {steps_per_s:.2f} steps/s")
     
 
 
