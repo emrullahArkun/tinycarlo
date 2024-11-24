@@ -58,13 +58,22 @@ class ReplaybufferTemporal:
 
 def create_critic_loss_graph(c1_loss: List[float], c2_loss: List[float]):
     import matplotlib.pyplot as plt
+    # Plot erstellen ohne gleitenden Durchschnitt
     plt.figure()
-    plt.plot(ma(c1_loss))
-    plt.plot(ma(c2_loss))
+    plt.plot(c1_loss)
+    plt.plot(c2_loss)
     plt.legend(["Critic 1 Loss", "Critic 2 Loss"])
     plt.xlabel("Steps")
     plt.ylabel("Loss")
-    plt.savefig("/tmp/critic_loss.png")
+    plt.title("Critic Loss over Steps")
+    plt.savefig("/home/emrullah/Schreibtisch/critic_loss.png")  # Bild speichern
+
+    # CSV speichern
+    with open("/home/emrullah/Schreibtisch/critic_loss.csv", mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Step", "Critic 1 Loss", "Critic 2 Loss"])  # Header
+        for step, (loss1, loss2) in enumerate(zip(c1_loss, c2_loss), start=1):
+            writer.writerow([step, loss1, loss2])  # Zeilen mit Schritt und beiden Loss-Werten schreiben
 
 def create_action_loss_graph(a_loss: List[float]):
     import matplotlib.pyplot as plt
@@ -72,10 +81,10 @@ def create_action_loss_graph(a_loss: List[float]):
     plt.plot(ma(a_loss))
     plt.xlabel("Steps")
     plt.ylabel("Loss")
-    plt.savefig("/tmp/actor_loss.png")
+    plt.savefig("/home/emrullah/Schreibtisch/actor_loss.png")
 
     # CSV speichern
-    with open("/tmp/actor_loss.csv", mode="w", newline="") as file:
+    with open("/home/emrullah/Schreibtisch/actor_loss.csv", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Step", "Loss"])  # Header
         for step, loss in enumerate(a_loss, start=1):
@@ -87,7 +96,7 @@ def create_ep_rew_graph(ep_rews: List[float]):
     plt.plot(ma(ep_rews, 10))
     plt.xlabel("Episodes")
     plt.ylabel("Episodic Reward")
-    plt.savefig("/tmp/ep_rew.png")
+    plt.savefig("/home/emrullah/Schreibtisch/ep_rew.png")
 
 def avg_w(x: List[float], w: int = 100) -> List[float]:
     if len(x) < w:

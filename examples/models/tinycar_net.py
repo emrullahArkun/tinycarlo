@@ -1,3 +1,5 @@
+import warnings
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -105,17 +107,27 @@ class TinycarCombo(nn.Module):
     def forward(self, x: torch.tensor, m: torch.tensor) -> torch.tensor:
         out = self.encoder(x)
         return self.actor(out, m)
-    
-    def load_pretrained(self, device) -> bool: 
+
+    import warnings
+
+    def load_pretrained(self, device) -> bool:
         if self.image_dim in model_urls and self.m_dim == DEFAULT_M_DIM and self.a_dim == DEFAULT_A_DIM:
             model_url = model_urls[self.image_dim]
             cached_file = os.path.join("/tmp", os.path.basename(model_url))
             if not os.path.exists(cached_file):
                 torch.hub.download_url_to_file(model_url, cached_file)
-            self.load_state_dict(torch.load(cached_file, map_location=device))
+
+            # Warnung nur um den relevanten Aufruf unterdrücken
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=FutureWarning)
+                self.load_state_dict(torch.load(cached_file, map_location=device))
+
             return True
-        print(f"No pretrained weights found for image_dim: {self.image_dim}, maneuver_dim: {self.m_dim}, action_dim: {self.a_dim}")
+
+        print(
+            f"No pretrained weights found for image_dim: {self.image_dim}, maneuver_dim: {self.m_dim}, action_dim: {self.a_dim}")
         return False
+
 
 class TinycarCritic(nn.Module):
     def __init__(self, maneuver_dim: int = DEFAULT_M_DIM, action_dim: int = DEFAULT_A_DIM):
