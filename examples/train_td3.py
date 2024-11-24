@@ -21,7 +21,7 @@ BATCH_SIZE = 256
 REPLAY_BUFFER_SIZE = 500_000
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 2e-4
-EPISODES = 1000
+EPISODES = 10
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
@@ -43,11 +43,11 @@ device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.ba
 
 if __name__ == "__main__":
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_simple_layout.yaml")
-    env = gym.make("tinycarlo-realworld-v2", config=config_path)
+    env = gym.make("tinycarlo-v2", config=config_path)
 
     env = CTELinearRewardWrapper(env, min_cte=0.03, max_reward=1.0, min_reward=-1.0)
     env = CTETerminationWrapper(env, max_cte=0.1, number_of_steps=5)
-    env = CrashTerminationWrapper(env)
+    #env = CrashTerminationWrapper(env)
 
     obs = pre_obs(env.reset()[0])  # seed the environment and get obs shape
     tinycar_combo = TinycarCombo(obs.shape)

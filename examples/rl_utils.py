@@ -1,3 +1,4 @@
+import csv
 from typing import List, Tuple
 import torch
 import torch.nn.functional as F
@@ -72,6 +73,13 @@ def create_action_loss_graph(a_loss: List[float]):
     plt.xlabel("Steps")
     plt.ylabel("Loss")
     plt.savefig("/tmp/actor_loss.png")
+
+    # CSV speichern
+    with open("/tmp/actor_loss.csv", mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Step", "Loss"])  # Header
+        for step, loss in enumerate(a_loss, start=1):
+            writer.writerow([step, loss])
 
 def create_ep_rew_graph(ep_rews: List[float]):
     import matplotlib.pyplot as plt
