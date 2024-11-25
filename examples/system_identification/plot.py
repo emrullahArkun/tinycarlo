@@ -8,61 +8,80 @@ app = Dash(__name__)
 app.layout = html.Div([
     html.H4('Actor und Critic Loss Graphen'),
     html.Div([
-        # Actor Loss Graph
-        dcc.Graph(
-            id="actor_graph",
-            style={"width": "1000px", "height": "1000px"}  # Quadratische Größe für Actor Loss
-        ),
-        # Critic Loss Graph
-        dcc.Graph(
-            id="critic_graph",
-            style={"width": "1100px", "height": "1000px"}  # Quadratische Größe für Critic Loss
+        dcc.Dropdown(
+            id='domain_selector',
+            options=[
+                {'label': 'With Domain Randomization', 'value': 'with'},
+                {'label': 'Without Domain Randomization', 'value': 'without'}
+            ],
+            value='without',  # Standardauswahl
+            style={"width": "50%"}
         )
-    ], style={"display": "flex", "flex-direction": "row"})  # Nebeneinander anzeigen
+    ], style={"margin-bottom": "20px"}),  # Abstand zwischen Dropdown und Graphen
+
+    html.Div(
+        id="graph_container",  # Container für die Graphen
+        style={"display": "flex", "flex-direction": "row"}  # Nebeneinander-Anordnung
+    )
 ])
 
 
 @app.callback(
-    [Output("actor_graph", "figure"),
-     Output("critic_graph", "figure")],
-    [Input("actor_graph", "id"), Input("critic_graph", "id")]
+    Output("graph_container", "children"),
+    Input("domain_selector", "value")
 )
-def display_graph(_, __):
-    # CSV-Datei für Actor Loss lesen
-    actor_df = pd.read_csv('/home/emrullah/Schreibtisch/actor_loss.csv')
+def update_page(domain_option):
+    if domain_option == "with":
+        # "With Domain Randomization" zeigt nichts an
+        return []
 
-    # CSV-Datei für Critic Loss lesen
-    critic_df = pd.read_csv('/home/emrullah/Schreibtisch/critic_loss.csv')
+    elif domain_option == "without":
+        # CSV-Dateien laden
+        actor_file = '/home/emrullah/Schreibtisch/actor_loss.csv'
+        critic_file = '/home/emrullah/Schreibtisch/critic_loss.csv'
 
-    # Gleitender Durchschnitt berechnen für Actor Loss
-    actor_df['Loss'] = actor_df['Loss'].rolling(window=200).mean()
+        actor_df = pd.read_csv(actor_file)
+        critic_df = pd.read_csv(critic_file)
 
-    # Gleitender Durchschnitt berechnen für beide Critic Losses
-    critic_df['Critic_1_Loss'] = critic_df['Critic 1 Loss'].rolling(window=200).mean()
-    critic_df['Critic_2_Loss'] = critic_df['Critic 2 Loss'].rolling(window=200).mean()
+        # Gleitender Durchschnitt berechnen
+        actor_df['Loss'] = actor_df['Loss'].rolling(window=10).mean()
+        critic_df['Critic_1_Loss'] = critic_df['Critic 1 Loss'].rolling(window=20).mean()
+        critic_df['Critic_2_Loss'] = critic_df['Critic 2 Loss'].rolling(window=20).mean()
 
-    # Plotly-Grafik für Actor Loss erstellen
-    actor_fig = px.line(actor_df, x='Step', y='Loss', title="Actor Loss")
-    actor_fig.update_layout(
-        autosize=False,
-        width=1000,  # Feste Breite
-        height=1000  # Feste Höhe
-    )
+        # Actor Loss Graph
+        actor_fig = px.line(actor_df, x='Step', y='Loss', title="Actor Loss (Without Domain Randomization)")
+        actor_fig.update_layout(
+            autosize=False,
+            width=1000,
+            height=1000
+        )
 
-    # Plotly-Grafik für Critic Loss erstellen (mit beiden smoothed Critic Losses)
-    critic_fig = px.line(
-        critic_df,
-        x='Step',
-        y=['Critic_1_Loss', 'Critic_2_Loss'],
-        title="Critic Loss"
-    )
-    critic_fig.update_layout(
-        autosize=False,
-        width=1100,  # Feste Breite
-        height=1000  # Feste Höhe
-    )
+        # Critic Loss Graph
+        critic_fig = px.line(
+            critic_df,
+            x='Step',
+            y=['Critic_1_Loss', 'Critic_2_Loss'],
+            title="Critic Loss (Without Domain Randomization)"
+        )
+        critic_fig.update_layout(
+            autosize=False,
+            width=1100,
+            height=1000
+        )
 
-    return actor_fig, critic_fig
+        # Graphen als HTML-Komponenten zurückgeben
+        return [
+            dcc.Graph(
+                id="actor_graph",
+                figure=actor_fig,
+                style={"width": "1000px", "height": "1000px"}  # Quadratische Größe für Actor Loss
+            ),
+            dcc.Graph(
+                id="critic_graph",
+                figure=critic_fig,
+                style={"width": "1100px", "height": "1000px"}  # Quadratische Größe für Critic Loss
+            )
+        ]
 
 
 if __name__ == "__main__":
