@@ -63,7 +63,7 @@ def create_critic_loss_graph(c1_loss: List[float], c2_loss: List[float]):
     plt.plot(c1_loss)
     plt.plot(c2_loss)
     plt.legend(["Critic 1 Loss", "Critic 2 Loss"])
-    plt.xlabel("Steps")
+    plt.xlabel("Step")
     plt.ylabel("Loss")
     plt.title("Critic Loss over Steps")
     plt.savefig("/home/emrullah/Schreibtisch/critic_loss.png")  # Bild speichern
@@ -79,7 +79,7 @@ def create_action_loss_graph(a_loss: List[float]):
     import matplotlib.pyplot as plt
     plt.figure()
     plt.plot(ma(a_loss))
-    plt.xlabel("Steps")
+    plt.xlabel("Step")
     plt.ylabel("Loss")
     plt.savefig("/home/emrullah/Schreibtisch/actor_loss.png")
 
@@ -97,6 +97,13 @@ def create_ep_rew_graph(ep_rews: List[float]):
     plt.xlabel("Episodes")
     plt.ylabel("Episodic Reward")
     plt.savefig("/home/emrullah/Schreibtisch/ep_rew.png")
+
+    # CSV speichern
+    with open("/home/emrullah/Schreibtisch/rew.csv", mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Episode", "Reward"])  # Header
+        for episode, reward in enumerate(ep_rews, start=1):
+            writer.writerow([episode, reward])
 
 def avg_w(x: List[float], w: int = 100) -> List[float]:
     if len(x) < w:
