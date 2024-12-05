@@ -6,19 +6,19 @@ register_page(__name__, path="/without_shift")  # Registriert diese Datei als ei
 
 def layout():
     # Bild/Segmentation
-    outer_df = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/outer_without_shift')
-    dashed_df = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/dashed_without_shift')
-    solid_df = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/solid_without_shift')
-    hold_df = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/hold_without_shift')
-    area_df = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/area_without_shift')
+    outer_df = pd.read_csv('../data/outer_without_shift')
+    dashed_df = pd.read_csv('../data/dashed_without_shift')
+    solid_df = pd.read_csv('../data/solid_without_shift')
+    hold_df = pd.read_csv('../data/hold_without_shift')
+    area_df = pd.read_csv('../data/area_without_shift')
 
     # Encoder
 
     # RL-Netze
-    critic_loss = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/critic_loss_without_shift')
+    critic_loss = pd.read_csv('../data/critic_loss_without_shift')
     critic_loss = critic_loss.melt(id_vars=['Step'], value_vars=['Critic 1 Loss', 'Critic 2 Loss'], var_name='Critic', value_name='Loss')
-    actor_loss = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/actor_loss_without_shift')
-    ep_rew = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/rew_without_shift')
+    actor_loss = pd.read_csv('../data/actor_loss_without_shift')
+    ep_rew = pd.read_csv('../data/rew_without_shift')
 
     # Gleitender Durchschnitt für die Daten berechnen
     window_size = 200

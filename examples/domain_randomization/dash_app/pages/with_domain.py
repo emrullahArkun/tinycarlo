@@ -6,16 +6,16 @@ register_page(__name__, path="/with_shift")  # Registriert diese Datei als eine 
 
 def layout():
     # Lade die CSV-Dateien
-    outer_df = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/outer_with_shift')
-    dashed_df = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/dashed_with_shift')
-    solid_df = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/solid_with_shift')
-    hold_df = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/hold_with_shift')
-    area_df = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/area_with_shift')
+    outer_df = pd.read_csv('../data/outer_with_shift')
+    dashed_df = pd.read_csv('../data/dashed_with_shift')
+    solid_df = pd.read_csv('../data/solid_with_shift')
+    hold_df = pd.read_csv('../data/hold_with_shift')
+    area_df = pd.read_csv('../data/area_with_shift')
 
-    critic_loss = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/critic_loss_with_shift')
+    critic_loss = pd.read_csv('../data/critic_loss_with_shift')
     critic_loss = critic_loss.melt(id_vars=['Step'], value_vars=['Critic 1 Loss', 'Critic 2 Loss'], var_name='Critic',value_name='Loss')
-    actor_loss = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/actor_loss_with_shift')
-    ep_rew = pd.read_csv('/home/emrullah/Schreibtisch/tinycarlo/examples/domain_randomization/data/rew_with_shift')
+    actor_loss = pd.read_csv('../data/actor_loss_with_shift')
+    ep_rew = pd.read_csv('../data/rew_with_shift')
 
     # Gleitender Durchschnitt für die Daten berechnen
     window_size = 200
