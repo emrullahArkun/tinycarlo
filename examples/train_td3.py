@@ -1,4 +1,7 @@
 import gymnasium as gym
+import imageio.v2 as imageio
+from matplotlib import pyplot as plt
+
 import tinycarlo
 from typing import Tuple, List
 import torch
@@ -9,26 +12,31 @@ import numpy as np
 from tqdm import trange
 import time
 
+from examples.domain_randomization.vis_utils import visualize_observation_streaming, create_distance_graph
 from tinycarlo.wrapper.reward import CTELinearRewardWrapper, LanelineSparseRewardWrapper
 from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper, CTETerminationWrapper, CrashTerminationWrapper
 from examples.models.tinycar_net import TinycarActorTemporal, TinycarCriticTemporal, TinycarCombo, TinycarEncoder
 from examples.benchmark_tinycar_net import pre_obs, evaluate
 from tinycarlo.helper import getenv
-from examples.rl_utils import avg_w, create_action_loss_graph, create_critic_loss_graph, create_ep_rew_graph, Replaybuffer, ReplaybufferTemporal
+from examples.rl_utils import avg_w, create_action_loss_graph, create_critic_loss_graph, create_ep_rew_graph, \
+    Replaybuffer, ReplaybufferTemporal
 
 # *** hyperparameters ***
 BATCH_SIZE = 256
 REPLAY_BUFFER_SIZE = 500_000
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 2e-4
-EPISODES = 1000
+EPISODES = 5
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
 MAX_STEPS = 1000
 
+# Shift Parameter
+INCLUDE_SHIFT = True  # Global parameter for the shift in steering angle
+
 # *** environment parameters ***
-SPEED = 0.4
+SPEED = 0.5
 
 NOISE_THETA = 0.1
 NOISE_MEAN = 0.0
@@ -36,18 +44,21 @@ NOISE_SIGMA = 0.4
 
 SEQ_LEN = 10
 
+STEERING_SHIFT = -1.0
+
 MODEL_SAVEFILE = "/tmp/actor_td3.pt"
 PRETRAINED_MODEL = sys.argv[1] if len(sys.argv) > 1 else None
 
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
 if __name__ == "__main__":
+    print(f"Shift in steering angle: {INCLUDE_SHIFT}")
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_simple_layout.yaml")
     env = gym.make("tinycarlo-v2", config=config_path)
 
     env = CTELinearRewardWrapper(env, min_cte=0.03, max_reward=1.0, min_reward=-1.0)
     env = CTETerminationWrapper(env, max_cte=0.1, number_of_steps=5)
-    #env = CrashTerminationWrapper(env)
+    env = CrashTerminationWrapper(env)
 
     obs = pre_obs(env.reset()[0])  # seed the environment and get obs shape
     tinycar_combo = TinycarCombo(obs.shape)
@@ -126,10 +137,13 @@ if __name__ == "__main__":
         return actor_loss
 
     def get_action(feature_vec: torch.Tensor, maneuver: torch.Tensor) -> torch.Tensor:
-        global noise, exploration_rate
+        global noise, exploration_rate, INCLUDE_SHIFT
         with torch.no_grad():
-            noise += NOISE_THETA * (NOISE_MEAN - noise) + NOISE_SIGMA * torch.randn(action_dim).to(device) # Ornstein-Uhlenbeck process
-            action = (actor(feature_vec.unsqueeze(0), maneuver.unsqueeze(0))[0] + noise).clamp(-1, 1).cpu()
+            noise += NOISE_THETA * (NOISE_MEAN - noise) + NOISE_SIGMA * torch.randn(action_dim).to(device)  # Ornstein-Uhlenbeck process
+            action = actor(feature_vec.unsqueeze(0), maneuver.unsqueeze(0))[0]
+            if INCLUDE_SHIFT:
+                action += noise
+            action = action.clamp(-1, 1).cpu()
         return action
     
     def get_feature_vec(obs: torch.Tensor) -> torch.Tensor:
@@ -137,47 +151,65 @@ if __name__ == "__main__":
             feature_vec = encoder(obs.unsqueeze(0))[0]
         return feature_vec
 
-    st, steps = time.perf_counter(), 0
-    rews = []
-    c1_loss, c2_loss, a_loss = [],[],[]
-    feature_vec_queue = torch.zeros(SEQ_LEN+1, TinycarEncoder.FEATURE_VEC_SIZE).to(device)
-    for episode_number in (t := trange(EPISODES)):
-        feature_vec_queue = torch.roll(feature_vec_queue, 1, 0)
-        feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(env.reset()[0])).to(device))
-
-        noise = torch.zeros(action_dim).to(device) # reset the noise
-        maneuver = np.random.randint(0, 3)
-        NOISE_SIGMA = 0.4 * (1 - (episode_number / EPISODES))
-        ep_rew = 0
-        for ep_step in range(MAX_STEPS):
-            m = F.one_hot(torch.tensor(maneuver), tinycar_combo.m_dim).float().to(device)
-            act = get_action(feature_vec_queue[:-1,:], m).item()
-            obs, rew, terminated, truncated, _ = env.step({"car_control": [SPEED, act], "maneuver": maneuver if maneuver != 2 else 3})
+    with imageio.get_writer('domain_randomization/data/observation.gif', mode='I', fps=20) as writer:
+        st, steps = time.perf_counter(), 0
+        rews = []
+        c1_loss, c2_loss, a_loss = [],[],[]
+        outer_dist, dashed_dist, solid_dist,hold_dist, area_dist  = [],[],[],[],[]
+        feature_vec_queue = torch.zeros(SEQ_LEN+1, TinycarEncoder.FEATURE_VEC_SIZE).to(device)
+        for episode_number in (t := trange(EPISODES)):
             feature_vec_queue = torch.roll(feature_vec_queue, 1, 0)
-            feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(obs)).to(device))
-            replay_buffer.add(feature_vec_queue[1:,:].cpu().numpy(), maneuver, act, rew, feature_vec_queue[:-1,:].cpu().numpy())
-            ep_rew += rew
-            steps += 1
-            if steps >= BATCH_SIZE:
-                sample = replay_buffer.sample()
-                critic1_loss, critic2_loss = train_step_critic(*sample)
-                c1_loss.append(critic1_loss.item())
-                c2_loss.append(critic2_loss.item())
-                if steps % POLICY_DELAY == 0:
-                    actor_loss = train_step_action(*sample[:2])
-                    a_loss.append(actor_loss.item())
-            t.set_description(f"sz: {replay_buffer.rp_sz:5d} | steps/s: {steps / (time.perf_counter() - st):.2f} | rew/ep {avg_w(rews, 10):3.2f}| c1 loss: {avg_w(c1_loss):3.3f} | c2 loss: {avg_w(c2_loss):3.3f} | actor loss: {avg_w(a_loss):3.3f}")
-            if terminated or truncated:
-                break
-        env.reset()
-        rews.append(ep_rew)
-        torch.save(actor.state_dict(), MODEL_SAVEFILE)
+            feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(env.reset()[0])).to(device))
+            noise = torch.zeros(action_dim).to(device) # reset the noise
+            maneuver = np.random.randint(0, 3)
+            NOISE_SIGMA = 0.4 * (1 - (episode_number / EPISODES))
+            ep_rew = 0
+            for ep_step in range(MAX_STEPS):
+                m = F.one_hot(torch.tensor(maneuver), tinycar_combo.m_dim).float().to(device)
+                act = get_action(feature_vec_queue[:-1,:], m).item()
+                obs, rew, terminated, truncated, info = env.step({"car_control": [SPEED, act], "maneuver": maneuver if maneuver != 2 else 3})
+                #print(obs[0].shape)
+                # Beobachtung visualisieren und zum GIF hinzufügen
+                visualize_observation_streaming(writer, obs[0])
 
+                # Append the current feature vector to the list
+                outer_dist.append(info["laneline_distances"]["solid"])
+                dashed_dist.append(info["laneline_distances"]["dashed"])
+                solid_dist.append(info["laneline_distances"]["solid"])
+                hold_dist.append(info["laneline_distances"]["hold"])
+                area_dist.append(info["laneline_distances"]["area"])
+
+                feature_vec_queue = torch.roll(feature_vec_queue, 1, 0)
+                feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(obs)).to(device))
+                replay_buffer.add(feature_vec_queue[1:,:].cpu().numpy(), maneuver, act, rew, feature_vec_queue[:-1,:].cpu().numpy())
+                ep_rew += rew
+                steps += 1
+                if steps >= BATCH_SIZE:
+                    sample = replay_buffer.sample()
+                    critic1_loss, critic2_loss = train_step_critic(*sample)
+                    c1_loss.append(critic1_loss.item())
+                    c2_loss.append(critic2_loss.item())
+                    if steps % POLICY_DELAY == 0:
+                        actor_loss = train_step_action(*sample[:2])
+                        a_loss.append(actor_loss.item())
+                t.set_description(f"sz: {replay_buffer.rp_sz:5d} | steps/s: {steps / (time.perf_counter() - st):.2f} | rew/ep {avg_w(rews, 10):3.2f}| c1 loss: {avg_w(c1_loss):3.3f} | c2 loss: {avg_w(c2_loss):3.3f} | actor loss: {avg_w(a_loss):3.3f}")
+                if terminated or truncated:
+                    break
+            env.reset()
+            rews.append(ep_rew)
+            torch.save(actor.state_dict(), MODEL_SAVEFILE)
     print(f"Saved model to: {MODEL_SAVEFILE}")
 
-    create_critic_loss_graph(c1_loss, c2_loss)
-    create_action_loss_graph(a_loss)
-    create_ep_rew_graph(rews)
+    shift_suffix = "with_shift" if INCLUDE_SHIFT else "without_shift"
+    create_critic_loss_graph(c1_loss, c2_loss,shift_suffix)
+    create_action_loss_graph(a_loss,shift_suffix)
+    create_ep_rew_graph(rews,shift_suffix)
+    # Create the graphs with the appropriate filenames
+    create_distance_graph(outer_dist, "outer",shift_suffix)
+    create_distance_graph(dashed_dist, "dashed",shift_suffix)
+    create_distance_graph(solid_dist, "solid",shift_suffix)
+    create_distance_graph(hold_dist, "hold",shift_suffix)
+    create_distance_graph(area_dist, "area",shift_suffix)
 
     print("Evaluating:")
     tinycar_combo.actor = actor

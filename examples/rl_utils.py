@@ -56,7 +56,7 @@ class ReplaybufferTemporal:
     def __getitem__(self, indices):
         return self.X[indices], self.M[indices], self.A[indices], self.R[indices], self.X1[indices], self.M[indices]
 
-def create_critic_loss_graph(c1_loss: List[float], c2_loss: List[float]):
+def create_critic_loss_graph(c1_loss: List[float], c2_loss: List[float], suffix: str):
     import matplotlib.pyplot as plt
     # Plot erstellen ohne gleitenden Durchschnitt
     plt.figure()
@@ -69,13 +69,13 @@ def create_critic_loss_graph(c1_loss: List[float], c2_loss: List[float]):
     plt.savefig("/home/emrullah/Schreibtisch/critic_loss.png")  # Bild speichern
 
     # CSV speichern
-    with open("/home/emrullah/Schreibtisch/critic_loss.csv", mode="w", newline="") as file:
+    with open(f"domain_randomization/data/critic_loss_{suffix}", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Step", "Critic 1 Loss", "Critic 2 Loss"])  # Header
         for step, (loss1, loss2) in enumerate(zip(c1_loss, c2_loss), start=1):
             writer.writerow([step, loss1, loss2])  # Zeilen mit Schritt und beiden Loss-Werten schreiben
 
-def create_action_loss_graph(a_loss: List[float]):
+def create_action_loss_graph(a_loss: List[float], suffix: str):
     import matplotlib.pyplot as plt
     plt.figure()
     plt.plot(ma(a_loss))
@@ -84,13 +84,13 @@ def create_action_loss_graph(a_loss: List[float]):
     plt.savefig("/home/emrullah/Schreibtisch/actor_loss.png")
 
     # CSV speichern
-    with open("/home/emrullah/Schreibtisch/actor_loss.csv", mode="w", newline="") as file:
+    with open(f"domain_randomization/data/actor_loss_{suffix}", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Step", "Loss"])  # Header
         for step, loss in enumerate(a_loss, start=1):
             writer.writerow([step, loss])
 
-def create_ep_rew_graph(ep_rews: List[float]):
+def create_ep_rew_graph(ep_rews: List[float], suffix: str):
     import matplotlib.pyplot as plt
     plt.figure()
     plt.plot(ma(ep_rews, 10))
@@ -99,7 +99,7 @@ def create_ep_rew_graph(ep_rews: List[float]):
     plt.savefig("/home/emrullah/Schreibtisch/ep_rew.png")
 
     # CSV speichern
-    with open("/home/emrullah/Schreibtisch/rew.csv", mode="w", newline="") as file:
+    with open(f"domain_randomization/data/rew_{suffix}", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Episode", "Reward"])  # Header
         for episode, reward in enumerate(ep_rews, start=1):
