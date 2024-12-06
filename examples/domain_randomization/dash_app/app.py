@@ -9,8 +9,8 @@ app.layout = html.Div([
 
     # Navigationsleiste mit Links zu den Seiten
     html.Div([
-        dcc.Link("With Shift", href="/with_shift", style={"margin-right": "20px"}),
-        dcc.Link("Without Shift", href="/without_shift", style={"margin-right": "20px"})
+        dcc.Link("Mit Shift", href="/mit_shift", style={"margin-right": "20px"}),
+        dcc.Link("Ohne Shift", href="/ohne_shift", style={"margin-right": "20px"})
     ], style={"padding": "10px", "background-color": "#f2f2f2", "margin-bottom": "20px"}),
 
 
@@ -25,7 +25,7 @@ app.layout = html.Div([
 )
 def redirect_to_default(pathname):
     if pathname == "/":
-        return "/without_shift"  # Weiterleitung zur Standardseite
+        return "/ohne_shift"  # Weiterleitung zur Standardseite
     return pathname
 
 if __name__ == "__main__":

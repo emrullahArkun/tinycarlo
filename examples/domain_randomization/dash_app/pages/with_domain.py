@@ -2,7 +2,7 @@ from dash import html, register_page, dcc
 import plotly.express as px
 import pandas as pd
 
-register_page(__name__, path="/with_shift")  # Registriert diese Datei als eine Seite
+register_page(__name__, path="/mit_shift")  # Registriert diese Datei als eine Seite
 
 def layout():
     # Lade die CSV-Dateien

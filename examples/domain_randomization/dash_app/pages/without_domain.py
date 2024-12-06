@@ -2,7 +2,7 @@ from dash import html, register_page, dcc
 import plotly.express as px
 import pandas as pd
 
-register_page(__name__, path="/without_shift")  # Registriert diese Datei als eine Seite
+register_page(__name__, path="/ohne_shift")  # Registriert diese Datei als eine Seite
 
 def layout():
     # Bild/Segmentation
@@ -53,7 +53,7 @@ def layout():
     # Rückgabe des Layouts der Seite
     return html.Div([
         html.H1("Ohne Shift im Lenkwinkel"),
-        html.H3("Bild / Segmentation"),
+        html.H2("Bild / Segmentation", style={"margin-bottom": "10px"}),
         html.Div([
             dcc.Graph(figure=outer_fig, style={"width": "500px", "height": "500px"}),
             dcc.Graph(figure=dashed_fig, style={"width": "500px", "height": "500px"}),
@@ -61,8 +61,8 @@ def layout():
             dcc.Graph(figure=hold_fig, style={"width": "500px", "height": "500px"}),
             dcc.Graph(figure=area_fig, style={"width": "500px", "height": "500px"})
         ], style={"display": "flex", "flex-direction": "row", "flex-wrap": "wrap"}),
-        html.H3("Encoder"),
-        html.H3("RL-Netze"),
+        html.H2("Encoder"),
+        html.H2("RL-Netze"),
         html.Div([
             dcc.Graph(figure=actor_loss_fig, style={"width": "500px", "height": "500px"}),
             dcc.Graph(figure=critic_loss_fig, style={"width": "500px", "height": "500px"}),
