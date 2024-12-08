@@ -12,7 +12,7 @@ import numpy as np
 from tqdm import trange
 import time
 
-from examples.domain_randomization.vis_utils import visualize_observation_streaming, create_distance_graph
+from examples.domain_randomization.vis_utils import create_distance_graph, create_cte_graph
 from tinycarlo.wrapper.reward import CTELinearRewardWrapper, LanelineSparseRewardWrapper
 from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper, CTETerminationWrapper, CrashTerminationWrapper
 from examples.models.tinycar_net import TinycarActorTemporal, TinycarCriticTemporal, TinycarCombo, TinycarEncoder
@@ -26,7 +26,7 @@ BATCH_SIZE = 256
 REPLAY_BUFFER_SIZE = 500_000
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 2e-4
-EPISODES = 5
+EPISODES = 10
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
@@ -36,7 +36,7 @@ MAX_STEPS = 1000
 INCLUDE_SHIFT = True  # Global parameter for the shift in steering angle
 
 # *** environment parameters ***
-SPEED = 0.5
+SPEED = 0.4
 
 NOISE_THETA = 0.1
 NOISE_MEAN = 0.0
@@ -44,7 +44,7 @@ NOISE_SIGMA = 0.4
 
 SEQ_LEN = 10
 
-STEERING_SHIFT = -1.0
+STEERING_SHIFT = -0.001
 
 MODEL_SAVEFILE = "/tmp/actor_td3.pt"
 PRETRAINED_MODEL = sys.argv[1] if len(sys.argv) > 1 else None
@@ -54,7 +54,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.ba
 if __name__ == "__main__":
     print(f"Shift in steering angle: {INCLUDE_SHIFT}")
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./config_simple_layout.yaml")
-    env = gym.make("tinycarlo-v2", config=config_path)
+    env = gym.make("tinycarlo-v2", config=config_path, render_mode="human")
 
     env = CTELinearRewardWrapper(env, min_cte=0.03, max_reward=1.0, min_reward=-1.0)
     env = CTETerminationWrapper(env, max_cte=0.1, number_of_steps=5)
@@ -141,9 +141,11 @@ if __name__ == "__main__":
         with torch.no_grad():
             noise += NOISE_THETA * (NOISE_MEAN - noise) + NOISE_SIGMA * torch.randn(action_dim).to(device)  # Ornstein-Uhlenbeck process
             action = actor(feature_vec.unsqueeze(0), maneuver.unsqueeze(0))[0]
+            #print(f"Action: {action} before adding noise")
             if INCLUDE_SHIFT:
-                action += noise
+                torch.add(action, STEERING_SHIFT, out=action)
             action = action.clamp(-1, 1).cpu()
+            #print(f"Action: {action} after adding noise")
         return action
     
     def get_feature_vec(obs: torch.Tensor) -> torch.Tensor:
@@ -151,55 +153,111 @@ if __name__ == "__main__":
             feature_vec = encoder(obs.unsqueeze(0))[0]
         return feature_vec
 
-    with imageio.get_writer('domain_randomization/data/observation.gif', mode='I', fps=20) as writer:
-        st, steps = time.perf_counter(), 0
-        rews = []
-        c1_loss, c2_loss, a_loss = [],[],[]
-        outer_dist, dashed_dist, solid_dist,hold_dist, area_dist  = [],[],[],[],[]
-        feature_vec_queue = torch.zeros(SEQ_LEN+1, TinycarEncoder.FEATURE_VEC_SIZE).to(device)
-        for episode_number in (t := trange(EPISODES)):
+
+    def save_weights(network, step, weight_history):
+        weight_history[step] = {name: param.clone().cpu().detach().numpy() for name, param in network.named_parameters() if 'weight' in name}
+
+
+    def plot_all_weight_changes(weight_changes):
+        steps = sorted(weight_changes.keys())
+        plt.figure(figsize=(15, 10))
+
+        # Define colors for each layer type
+        layer_colors = {
+            'cnn': 'blue',
+            'fc': 'green',
+            'fcm': 'red'
+        }
+
+        for layer_name in weight_changes[steps[0]].keys():
+            changes = [np.mean(weight_changes[step][layer_name]) for step in steps]
+            # Determine the color based on the layer type
+            if 'cnn' in layer_name:
+                color = layer_colors['cnn']
+            elif 'fc' in layer_name and 'fcm' not in layer_name and not 'fca' in layer_name:
+                color = layer_colors['fc']
+            elif 'fcm' in layer_name:
+                color = layer_colors['fcm']
+            else:
+                color = 'black'  # Default color if layer type is not recognized
+            plt.plot(steps, changes, label=layer_name, color=color)
+
+        plt.xlabel('Training Steps')
+        plt.ylabel('Mean Absolute Weight Change')
+        plt.title('Weight Plasticity of All Layers')
+        plt.legend()
+        plt.show()
+
+
+    def calculate_weight_changes(weight_history):
+        weight_changes = {}
+        steps = sorted(weight_history.keys())
+        for i in range(1, len(steps)):
+            step = steps[i]
+            prev_step = steps[i - 1]
+            weight_changes[step] = {}
+            for name in weight_history[step]:
+                weight_changes[step][name] = np.abs(weight_history[step][name] - weight_history[prev_step][name])
+        return weight_changes
+
+    st, steps = time.perf_counter(), 0
+    rews = []
+    c1_loss, c2_loss, a_loss = [],[],[]
+    outer_dist, dashed_dist, solid_dist,hold_dist, area_dist  = [],[],[],[],[]
+    feature_vec_queue = torch.zeros(SEQ_LEN+1, TinycarEncoder.FEATURE_VEC_SIZE).to(device)
+    ctes = []
+    # Initialize a dictionary to store weights
+    actor_weight_history = {}
+    critic1_weight_history = {}
+    critic2_weight_history = {}
+    # Save initial weights
+    save_weights(actor, 0, actor_weight_history)
+    save_weights(actor, 0, critic1_weight_history)
+    save_weights(actor, 0, critic2_weight_history)
+    for episode_number in (t := trange(EPISODES)):
+        feature_vec_queue = torch.roll(feature_vec_queue, 1, 0)
+        feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(env.reset()[0])).to(device))
+        noise = torch.zeros(action_dim).to(device) # reset the noise
+        maneuver = np.random.randint(0, 3)
+        NOISE_SIGMA = 0.4 * (1 - (episode_number / EPISODES))
+        ep_rew = 0
+        for ep_step in range(MAX_STEPS):
+            if steps % 200 == 0:  # Save weights every 1000 steps
+                save_weights(actor, steps, actor_weight_history)
+                save_weights(critic1, steps,critic1_weight_history)
+                save_weights(critic2, steps, critic2_weight_history)
+            m = F.one_hot(torch.tensor(maneuver), tinycar_combo.m_dim).float().to(device)
+            act = get_action(feature_vec_queue[:-1,:], m).item()
+            obs, rew, terminated, truncated, info = env.step({"car_control": [SPEED, act], "maneuver": maneuver if maneuver != 2 else 3})
+            ctes.append(info["cte"])
+            #print(actor.state_dict().keys())
+            # Append the current feature vector to the list
+            outer_dist.append(info["laneline_distances"]["solid"])
+            dashed_dist.append(info["laneline_distances"]["dashed"])
+            solid_dist.append(info["laneline_distances"]["solid"])
+            hold_dist.append(info["laneline_distances"]["hold"])
+            area_dist.append(info["laneline_distances"]["area"])
+
             feature_vec_queue = torch.roll(feature_vec_queue, 1, 0)
-            feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(env.reset()[0])).to(device))
-            noise = torch.zeros(action_dim).to(device) # reset the noise
-            maneuver = np.random.randint(0, 3)
-            NOISE_SIGMA = 0.4 * (1 - (episode_number / EPISODES))
-            ep_rew = 0
-            for ep_step in range(MAX_STEPS):
-                m = F.one_hot(torch.tensor(maneuver), tinycar_combo.m_dim).float().to(device)
-                act = get_action(feature_vec_queue[:-1,:], m).item()
-                obs, rew, terminated, truncated, info = env.step({"car_control": [SPEED, act], "maneuver": maneuver if maneuver != 2 else 3})
-                #print(obs[0].shape)
-                # Beobachtung visualisieren und zum GIF hinzufügen
-                visualize_observation_streaming(writer, obs[0])
-
-                # Append the current feature vector to the list
-                outer_dist.append(info["laneline_distances"]["solid"])
-                dashed_dist.append(info["laneline_distances"]["dashed"])
-                solid_dist.append(info["laneline_distances"]["solid"])
-                hold_dist.append(info["laneline_distances"]["hold"])
-                area_dist.append(info["laneline_distances"]["area"])
-
-                feature_vec_queue = torch.roll(feature_vec_queue, 1, 0)
-                feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(obs)).to(device))
-                replay_buffer.add(feature_vec_queue[1:,:].cpu().numpy(), maneuver, act, rew, feature_vec_queue[:-1,:].cpu().numpy())
-                ep_rew += rew
-                steps += 1
-                if steps >= BATCH_SIZE:
-                    sample = replay_buffer.sample()
-                    critic1_loss, critic2_loss = train_step_critic(*sample)
-                    c1_loss.append(critic1_loss.item())
-                    c2_loss.append(critic2_loss.item())
-                    if steps % POLICY_DELAY == 0:
-                        actor_loss = train_step_action(*sample[:2])
-                        a_loss.append(actor_loss.item())
-                t.set_description(f"sz: {replay_buffer.rp_sz:5d} | steps/s: {steps / (time.perf_counter() - st):.2f} | rew/ep {avg_w(rews, 10):3.2f}| c1 loss: {avg_w(c1_loss):3.3f} | c2 loss: {avg_w(c2_loss):3.3f} | actor loss: {avg_w(a_loss):3.3f}")
-                if terminated or truncated:
-                    break
-            env.reset()
-            rews.append(ep_rew)
-            torch.save(actor.state_dict(), MODEL_SAVEFILE)
+            feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(obs)).to(device))
+            replay_buffer.add(feature_vec_queue[1:,:].cpu().numpy(), maneuver, act, rew, feature_vec_queue[:-1,:].cpu().numpy())
+            ep_rew += rew
+            steps += 1
+            if steps >= BATCH_SIZE:
+                sample = replay_buffer.sample()
+                critic1_loss, critic2_loss = train_step_critic(*sample)
+                c1_loss.append(critic1_loss.item())
+                c2_loss.append(critic2_loss.item())
+                if steps % POLICY_DELAY == 0:
+                    actor_loss = train_step_action(*sample[:2])
+                    a_loss.append(actor_loss.item())
+            t.set_description(f"sz: {replay_buffer.rp_sz:5d} | steps/s: {steps / (time.perf_counter() - st):.2f} | rew/ep {avg_w(rews, 10):3.2f}| c1 loss: {avg_w(c1_loss):3.3f} | c2 loss: {avg_w(c2_loss):3.3f} | actor loss: {avg_w(a_loss):3.3f}")
+            if terminated or truncated:
+                break
+        env.reset()
+        rews.append(ep_rew)
+        torch.save(actor.state_dict(), MODEL_SAVEFILE)
     print(f"Saved model to: {MODEL_SAVEFILE}")
-
     shift_suffix = "with_shift" if INCLUDE_SHIFT else "without_shift"
     create_critic_loss_graph(c1_loss, c2_loss,shift_suffix)
     create_action_loss_graph(a_loss,shift_suffix)
@@ -210,6 +268,14 @@ if __name__ == "__main__":
     create_distance_graph(solid_dist, "solid",shift_suffix)
     create_distance_graph(hold_dist, "hold",shift_suffix)
     create_distance_graph(area_dist, "area",shift_suffix)
+    create_cte_graph(ctes, "cte",shift_suffix)
+    actor_weight_changes = calculate_weight_changes(actor_weight_history)
+    critic1_weight_changes = calculate_weight_changes(critic1_weight_history)
+    critic2_weight_changes = calculate_weight_changes(critic2_weight_history)
+    # Plot weight changes for a specific layer
+    plot_all_weight_changes(actor_weight_changes)
+    plot_all_weight_changes(critic1_weight_changes)
+    plot_all_weight_changes(critic2_weight_changes)
 
     print("Evaluating:")
     tinycar_combo.actor = actor

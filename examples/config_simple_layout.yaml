@@ -1,7 +1,7 @@
 sim:
   fps: 30 # int
   render_realtime: True # boolean
-  observation_space_format: classes # "rgb" or "classes"
+  observation_space_format: rgb # "rgb" or "classes"
   real_world_env: 'autosys' # optional: Used only when using tinycarlo-realworld to identify implementation
 car:
   wheelbase: 0.0487 # m

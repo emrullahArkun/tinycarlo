@@ -16,6 +16,7 @@ def layout():
     critic_loss = critic_loss.melt(id_vars=['Step'], value_vars=['Critic 1 Loss', 'Critic 2 Loss'], var_name='Critic',value_name='Loss')
     actor_loss = pd.read_csv('../data/actor_loss_with_shift')
     ep_rew = pd.read_csv('../data/rew_with_shift')
+    cte = pd.read_csv('../data/cte_with_shift')
 
     # Gleitender Durchschnitt für die Daten berechnen
     window_size = 200
@@ -24,6 +25,9 @@ def layout():
     solid_df['Distance'] = solid_df['Distance'].rolling(window=window_size).mean()
     hold_df['Distance'] = hold_df['Distance'].rolling(window=window_size).mean()
     area_df['Distance'] = area_df['Distance'].rolling(window=window_size).mean()
+    actor_loss['Loss'] = actor_loss['Loss'].rolling(window=window_size).mean()
+    critic_loss['Loss'] = critic_loss['Loss'].rolling(window=window_size).mean()
+    cte['CTE'] = cte['CTE'].rolling(window=500).mean()
 
     # Erstelle die Diagramme
     outer_fig = px.line(outer_df, x='Step', y='Distance', title="Outer Distance")
@@ -35,9 +39,10 @@ def layout():
     critic_loss_fig = px.line(critic_loss, x='Step', y='Loss', color='Critic', title="Critic Loss")
     actor_loss_fig = px.line(actor_loss, x='Step', y='Loss', title="Actor Loss")
     ep_rew_fig = px.line(ep_rew, x='Episode', y='Reward', title="Episodic Reward")
+    cte_fig = px.line(cte, x='Step', y='CTE', title="CTE")
 
     # Layout für die Diagramme anpassen
-    for fig in [outer_fig, dashed_fig, solid_fig, hold_fig, area_fig, critic_loss_fig, actor_loss_fig, ep_rew_fig]:
+    for fig in [outer_fig, dashed_fig, solid_fig, hold_fig, area_fig, critic_loss_fig, actor_loss_fig, ep_rew_fig, cte_fig]:
         fig.update_layout(
             autosize=False,
             width=500,
@@ -63,5 +68,6 @@ def layout():
             dcc.Graph(figure=actor_loss_fig, style={"width": "500px", "height": "500px"}),
             dcc.Graph(figure=critic_loss_fig, style={"width": "500px", "height": "500px"}),
             dcc.Graph(figure=ep_rew_fig, style={"width": "500px", "height": "500px"}),
+            dcc.Graph(figure=cte_fig, style={"width": "500px", "height": "500px"})
         ], style={"display": "flex", "flex-direction": "row", "flex-wrap": "wrap"}),
     ])
