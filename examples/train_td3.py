@@ -12,7 +12,8 @@ import numpy as np
 from tqdm import trange
 import time
 
-from examples.domain_randomization.vis_utils import create_distance_graph, create_cte_graph
+from examples.domain_randomization.vis_utils import create_distance_graph, create_cte_graph, calculate_weight_changes, \
+    plot_all_weight_changes
 from tinycarlo.wrapper.reward import CTELinearRewardWrapper, LanelineSparseRewardWrapper
 from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper, CTETerminationWrapper, CrashTerminationWrapper
 from examples.models.tinycar_net import TinycarActorTemporal, TinycarCriticTemporal, TinycarCombo, TinycarEncoder
@@ -26,7 +27,7 @@ BATCH_SIZE = 256
 REPLAY_BUFFER_SIZE = 500_000
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 2e-4
-EPISODES = 10
+EPISODES = 100
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
@@ -44,7 +45,7 @@ NOISE_SIGMA = 0.4
 
 SEQ_LEN = 10
 
-STEERING_SHIFT = -0.001
+STEERING_SHIFT = -0.01
 
 MODEL_SAVEFILE = "/tmp/actor_td3.pt"
 PRETRAINED_MODEL = sys.argv[1] if len(sys.argv) > 1 else None
@@ -140,7 +141,7 @@ if __name__ == "__main__":
         global noise, exploration_rate, INCLUDE_SHIFT
         with torch.no_grad():
             noise += NOISE_THETA * (NOISE_MEAN - noise) + NOISE_SIGMA * torch.randn(action_dim).to(device)  # Ornstein-Uhlenbeck process
-            action = actor(feature_vec.unsqueeze(0), maneuver.unsqueeze(0))[0]
+            action = (actor(feature_vec.unsqueeze(0), maneuver.unsqueeze(0))[0] + noise)
             #print(f"Action: {action} before adding noise")
             if INCLUDE_SHIFT:
                 torch.add(action, STEERING_SHIFT, out=action)
@@ -156,54 +157,10 @@ if __name__ == "__main__":
 
     def save_weights(network, step, weight_history):
         weight_history[step] = {name: param.clone().cpu().detach().numpy() for name, param in network.named_parameters() if 'weight' in name}
-
-
-    def plot_all_weight_changes(weight_changes):
-        steps = sorted(weight_changes.keys())
-        plt.figure(figsize=(15, 10))
-
-        # Define colors for each layer type
-        layer_colors = {
-            'cnn': 'blue',
-            'fc': 'green',
-            'fcm': 'red'
-        }
-
-        for layer_name in weight_changes[steps[0]].keys():
-            changes = [np.mean(weight_changes[step][layer_name]) for step in steps]
-            # Determine the color based on the layer type
-            if 'cnn' in layer_name:
-                color = layer_colors['cnn']
-            elif 'fc' in layer_name and 'fcm' not in layer_name and not 'fca' in layer_name:
-                color = layer_colors['fc']
-            elif 'fcm' in layer_name:
-                color = layer_colors['fcm']
-            else:
-                color = 'black'  # Default color if layer type is not recognized
-            plt.plot(steps, changes, label=layer_name, color=color)
-
-        plt.xlabel('Training Steps')
-        plt.ylabel('Mean Absolute Weight Change')
-        plt.title('Weight Plasticity of All Layers')
-        plt.legend()
-        plt.show()
-
-
-    def calculate_weight_changes(weight_history):
-        weight_changes = {}
-        steps = sorted(weight_history.keys())
-        for i in range(1, len(steps)):
-            step = steps[i]
-            prev_step = steps[i - 1]
-            weight_changes[step] = {}
-            for name in weight_history[step]:
-                weight_changes[step][name] = np.abs(weight_history[step][name] - weight_history[prev_step][name])
-        return weight_changes
-
     st, steps = time.perf_counter(), 0
     rews = []
     c1_loss, c2_loss, a_loss = [],[],[]
-    outer_dist, dashed_dist, solid_dist,hold_dist, area_dist  = [],[],[],[],[]
+    outer_dist, dashed_dist, solid_dist  = [],[],[]
     feature_vec_queue = torch.zeros(SEQ_LEN+1, TinycarEncoder.FEATURE_VEC_SIZE).to(device)
     ctes = []
     # Initialize a dictionary to store weights
@@ -222,7 +179,7 @@ if __name__ == "__main__":
         NOISE_SIGMA = 0.4 * (1 - (episode_number / EPISODES))
         ep_rew = 0
         for ep_step in range(MAX_STEPS):
-            if steps % 200 == 0:  # Save weights every 1000 steps
+            if steps % 200 == 0:  # Save weights every 200 steps
                 save_weights(actor, steps, actor_weight_history)
                 save_weights(critic1, steps,critic1_weight_history)
                 save_weights(critic2, steps, critic2_weight_history)
@@ -235,8 +192,6 @@ if __name__ == "__main__":
             outer_dist.append(info["laneline_distances"]["solid"])
             dashed_dist.append(info["laneline_distances"]["dashed"])
             solid_dist.append(info["laneline_distances"]["solid"])
-            hold_dist.append(info["laneline_distances"]["hold"])
-            area_dist.append(info["laneline_distances"]["area"])
 
             feature_vec_queue = torch.roll(feature_vec_queue, 1, 0)
             feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(obs)).to(device))
@@ -258,6 +213,10 @@ if __name__ == "__main__":
         rews.append(ep_rew)
         torch.save(actor.state_dict(), MODEL_SAVEFILE)
     print(f"Saved model to: {MODEL_SAVEFILE}")
+
+
+
+    # Create the graphs with the appropriate suffix
     shift_suffix = "with_shift" if INCLUDE_SHIFT else "without_shift"
     create_critic_loss_graph(c1_loss, c2_loss,shift_suffix)
     create_action_loss_graph(a_loss,shift_suffix)
@@ -266,16 +225,16 @@ if __name__ == "__main__":
     create_distance_graph(outer_dist, "outer",shift_suffix)
     create_distance_graph(dashed_dist, "dashed",shift_suffix)
     create_distance_graph(solid_dist, "solid",shift_suffix)
-    create_distance_graph(hold_dist, "hold",shift_suffix)
-    create_distance_graph(area_dist, "area",shift_suffix)
     create_cte_graph(ctes, "cte",shift_suffix)
     actor_weight_changes = calculate_weight_changes(actor_weight_history)
     critic1_weight_changes = calculate_weight_changes(critic1_weight_history)
     critic2_weight_changes = calculate_weight_changes(critic2_weight_history)
     # Plot weight changes for a specific layer
-    plot_all_weight_changes(actor_weight_changes)
-    plot_all_weight_changes(critic1_weight_changes)
-    plot_all_weight_changes(critic2_weight_changes)
+    plot_all_weight_changes("actor",actor_weight_changes, shift_suffix)
+    plot_all_weight_changes("critic1",critic1_weight_changes,shift_suffix)
+    plot_all_weight_changes("critic2",critic2_weight_changes,shift_suffix)
+
+
 
     print("Evaluating:")
     tinycar_combo.actor = actor
