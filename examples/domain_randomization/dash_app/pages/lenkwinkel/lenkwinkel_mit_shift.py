@@ -3,7 +3,7 @@ from dash import register_page
 
 from examples.domain_randomization.dash_app.pages.layout_utils import create_layout
 
-register_page(__name__, path="/mit_shift")
+register_page(__name__, path="/lenkwinkel/mit_shift")
 
 base_path = '../data'
 

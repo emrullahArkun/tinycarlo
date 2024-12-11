@@ -1,10 +1,10 @@
-# without_domain.py
+# lenkwinkel_ohne_shift.py
 import os
 from dash import register_page
 
 from examples.domain_randomization.dash_app.pages.layout_utils import create_layout
 
-register_page(__name__, path="/ohne_shift")
+register_page(__name__, path="/lenkwinkel/ohne_shift")
 
 base_path = '../data'
 
