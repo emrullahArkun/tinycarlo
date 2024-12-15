@@ -11,7 +11,7 @@ app.layout = html.Div([
 
     # Navigation bar with links to the pages
     dbc.Navbar(
-        color="primary",
+        color="purple",
         dark=True,
         style={"margin-bottom": "20px"},
         children=[
@@ -25,17 +25,18 @@ app.layout = html.Div([
         ]
     ),
 
-    # Placeholder for the shift buttons
-    html.Div(id="shift-buttons", style={"position": "absolute", "top": "10px", "right": "10px"}),
+    # Placeholder for the shift dropdown
+    html.Div(id="shift-dropdown", style={"position": "absolute", "top": "5px", "right": "5px"}),
 
     # Space for the content of the pages
     dash.page_container
 ])
 
+
 # Callback to update the button color based on the click event and current page
 @app.callback(
     [Output("lenkwinkel-button", "color"), Output("akku-button", "color"),
-     Output("shift-buttons", "children")],
+     Output("shift-dropdown", "children")],
     [Input("lenkwinkel-button", "n_clicks"), Input("akku-button", "n_clicks"),
      Input("url", "pathname")],
     [State("lenkwinkel-button", "color"), State("akku-button", "color")]
@@ -45,27 +46,39 @@ def update_button_color(lenkwinkel_clicks, akku_clicks, pathname, lenkwinkel_col
 
     if not ctx.triggered:
         return lenkwinkel_color, akku_color, []
-
-    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
+    shift_label = "Mit Shift" if "mit_shift" in pathname else "Ohne Shift"
     if pathname.startswith("/lenkwinkel"):
         lenkwinkel_color = "light"
         akku_color = "light"
-        shift_buttons = [
-            dbc.Button("Mit Shift", id="mit-shift-button", href="/lenkwinkel/mit_shift", color="success" if button_id != "mit-shift-button" else "danger", className="me-2", style={"border-radius": "20px", "padding": "10px 20px", "box-shadow": "0 4px 8px rgba(0, 0, 0, 0.1)"}),
-            dbc.Button("Ohne Shift", id="ohne-shift-button", href="/lenkwinkel/ohne_shift", color="success" if button_id != "ohne-shift-button" else "danger", style={"border-radius": "20px", "padding": "10px 20px", "box-shadow": "0 4px 8px rgba(0, 0, 0, 0.1)"})
-        ]
+
+        shift_dropdown = dbc.DropdownMenu(
+            label=shift_label,
+            children=[
+                dbc.DropdownMenuItem("Mit Shift", href="/lenkwinkel/mit_shift"),
+                dbc.DropdownMenuItem("Ohne Shift", href="/lenkwinkel/ohne_shift")
+            ],
+            color="primary",
+            className="me-2",
+            style={"border-radius": "20px", "padding": "10px 20px", "box-shadow": "0 4px 8px rgba(0, 0, 0, 0.1)"}
+        )
     elif pathname.startswith("/akku"):
         lenkwinkel_color = "light"
         akku_color = "light"
-        shift_buttons = [
-            dbc.Button("Mit Shift", id="mit-shift-button", href="/akku/mit_shift", color="success" if button_id != "mit-shift-button" else "danger", className="me-2", style={"border-radius": "20px", "padding": "10px 20px", "box-shadow": "0 4px 8px rgba(0, 0, 0, 0.1)"}),
-            dbc.Button("Ohne Shift", id="ohne-shift-button", href="/akku/ohne_shift", color="success" if button_id != "ohne-shift-button" else "danger", style={"border-radius": "20px", "padding": "10px 20px", "box-shadow": "0 4px 8px rgba(0, 0, 0, 0.1)"})
-        ]
+        shift_dropdown = dbc.DropdownMenu(
+            label=shift_label,
+            children=[
+                dbc.DropdownMenuItem("Mit Shift", href="/akku/mit_shift"),
+                dbc.DropdownMenuItem("Ohne Shift", href="/akku/ohne_shift")
+            ],
+            color="success",
+            className="me-2",
+            style={"border-radius": "20px", "padding": "10px 20px", "box-shadow": "0 4px 8px rgba(0, 0, 0, 0.1)"}
+        )
     else:
-        shift_buttons = []
+        shift_dropdown = []
 
-    return lenkwinkel_color, akku_color, shift_buttons
+    return lenkwinkel_color, akku_color, shift_dropdown
+
 
 if __name__ == "__main__":
     app.run_server(debug=True)

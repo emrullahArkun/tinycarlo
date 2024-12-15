@@ -27,14 +27,14 @@ BATCH_SIZE = 256
 REPLAY_BUFFER_SIZE = 500_000
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 2e-4
-EPISODES = 5
+EPISODES = 30
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
 MAX_STEPS = 1000
 
 # Shift Parameter
-INCLUDE_SHIFT = True  # Global parameter for the shift in steering angle
+INCLUDE_SHIFT = False  # Global parameter for the shift in steering angle
 
 # *** environment parameters ***
 SPEED = 0.4
@@ -45,7 +45,7 @@ NOISE_SIGMA = 0.4
 
 SEQ_LEN = 10
 
-STEERING_SHIFT = -0.01
+STEERING_SHIFT = -0.1
 
 MODEL_SAVEFILE = "/tmp/actor_td3.pt"
 PRETRAINED_MODEL = sys.argv[1] if len(sys.argv) > 1 else None
@@ -192,7 +192,6 @@ if __name__ == "__main__":
             outer_dist.append(info["laneline_distances"]["solid"])
             dashed_dist.append(info["laneline_distances"]["dashed"])
             solid_dist.append(info["laneline_distances"]["solid"])
-
             feature_vec_queue = torch.roll(feature_vec_queue, 1, 0)
             feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(obs)).to(device))
             replay_buffer.add(feature_vec_queue[1:,:].cpu().numpy(), maneuver, act, rew, feature_vec_queue[:-1,:].cpu().numpy())

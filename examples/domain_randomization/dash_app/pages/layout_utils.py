@@ -3,6 +3,7 @@ import plotly.io as pio
 from dash import html, dcc
 import plotly.express as px
 import pandas as pd
+import dash
 
 # Define a figure template
 pio.templates["custom_template"] = pio.templates["simple_white"]
@@ -33,22 +34,22 @@ def create_layout(title, outer_file, dashed_file, solid_file, actor_weight_file,
 
     # Calculate rolling mean for the data
     window_size = 500
-    outer_df['Distance'] = outer_df['Distance'].rolling(window=window_size).mean()
-    dashed_df['Distance'] = dashed_df['Distance'].rolling(window=window_size).mean()
-    solid_df['Distance'] = solid_df['Distance'].rolling(window=window_size).mean()
-    actor_loss['Loss'] = actor_loss['Loss'].rolling(window=window_size).mean()
-    critic_loss['Loss'] = critic_loss['Loss'].rolling(window=window_size).mean()
-    cte['CTE'] = cte['CTE'].rolling(window=window_size).mean()
+    outer_df['New Distance'] = outer_df['Distance'].rolling(window=window_size).mean()
+    dashed_df['New Distance'] = dashed_df['Distance'].rolling(window=window_size).mean()
+    solid_df['New Distance'] = solid_df['Distance'].rolling(window=window_size).mean()
+    actor_loss['New Loss'] = actor_loss['Loss'].rolling(window=window_size).mean()
+    critic_loss['New Loss'] = critic_loss['Loss'].rolling(window=window_size).mean()
+    cte['New CTE'] = cte['CTE'].rolling(window=window_size).mean()
 
     # Create the plots
-    outer_fig = px.line(outer_df, x='Step', y='Distance', title="Outer Distance", template="custom_template")
-    dashed_fig = px.line(dashed_df, x='Step', y='Distance', title="Dashed Distance", template="custom_template")
-    solid_fig = px.line(solid_df, x='Step', y='Distance', title="Solid Distance", template="custom_template")
+    outer_fig = px.line(outer_df, x='New Distance', y='Step', title="Outer Distance", template="custom_template")
+    dashed_fig = px.line(dashed_df, x='New Distance', y='Step', title="Dashed Distance", template="custom_template")
+    solid_fig = px.line(solid_df, x='New Distance', y='Step', title="Solid Distance", template="custom_template")
 
-    critic_loss_fig = px.line(critic_loss, x='Step', y='Loss', color='Critic', title="Critic Loss", template="custom_template")
-    actor_loss_fig = px.line(actor_loss, x='Step', y='Loss', title="Actor Loss", template="custom_template")
+    critic_loss_fig = px.line(critic_loss, x='Step', y='New Loss', color='Critic', title="Critic Loss", template="custom_template")
+    actor_loss_fig = px.line(actor_loss, x='Step', y='New Loss', title="Actor Loss", template="custom_template")
     ep_rew_fig = px.line(ep_rew, x='Episode', y='Reward', title="Episodic Reward", template="custom_template")
-    cte_fig = px.line(cte, x='Step', y='CTE', title="CTE", template="custom_template")
+    cte_fig = px.line(cte, x='Step', y='New CTE', title="CTE", template="custom_template")
 
     # Assign different colors to each type of weight
     color_discrete_map = {
@@ -76,6 +77,26 @@ def create_layout(title, outer_file, dashed_file, solid_file, actor_weight_file,
             title_x=0.5,
             title_y=0.85
         )
+
+    # Update y-axis line color and position for outer_fig
+    outer_fig.update_yaxes(linecolor='red', side='right')
+
+    # Add vertical dashed yellow line for dashed_fig
+    dashed_fig.add_shape(
+        type="line",
+        x0=0,
+        x1=0,
+        y0=dashed_df['Step'].min(),
+        y1=dashed_df['Step'].max(),
+        line=dict(
+            color="yellow",
+            width=2,
+            dash="dash"
+        )
+    )
+
+    # Update y-axis line color and position for solid_fig
+    solid_fig.update_yaxes(linecolor='red', side='left')
 
     # Return the layout of the page
     return html.Div([
