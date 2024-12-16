@@ -100,7 +100,9 @@ def create_layout(title, outer_file, dashed_file, solid_file, actor_weight_file,
 
     # Return the layout of the page
     return html.Div([
-        html.H1(title),
+        html.H1(title, style={
+            "text-align": "center", "font-size": "60px", "color": "#ffffff", "font-family": "'Courier New', monospace",
+            "text-shadow": "2px 2px 0px #000000", "margin-bottom": "30px", }),
         html.H3("Bild / Segmentation"),
         html.Div([
             dcc.Graph(figure=outer_fig, style={"width": "500px", "height": "500px"}),
@@ -113,7 +115,9 @@ def create_layout(title, outer_file, dashed_file, solid_file, actor_weight_file,
             dcc.Graph(figure=actor_loss_fig, style={"width": "500px", "height": "500px"}),
             dcc.Graph(figure=critic_loss_fig, style={"width": "500px", "height": "500px"}),
             dcc.Graph(figure=ep_rew_fig, style={"width": "500px", "height": "500px"}),
-            dcc.Graph(figure=cte_fig, style={"width": "500px", "height": "500px"}),
+            dcc.Graph(figure=cte_fig, style={"width": "500px", "height": "500px"})
+        ], style={"display": "flex", "flex-direction": "row", "flex-wrap": "wrap"}),
+        html.Div([
             dcc.Graph(figure=actor_weight_fig, style={"width": "500px", "height": "500px"}),
             dcc.Graph(figure=critic1_weight_fig, style={"width": "500px", "height": "500px"}),
             dcc.Graph(figure=critic2_weight_fig, style={"width": "500px", "height": "500px"})

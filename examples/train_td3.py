@@ -1,6 +1,8 @@
 import gymnasium as gym
 import imageio.v2 as imageio
+import plotly.express as px
 from matplotlib import pyplot as plt
+from sklearn.manifold import TSNE
 
 import tinycarlo
 from typing import Tuple, List
@@ -27,14 +29,14 @@ BATCH_SIZE = 256
 REPLAY_BUFFER_SIZE = 500_000
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 2e-4
-EPISODES = 30
+EPISODES = 100
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
 MAX_STEPS = 1000
 
 # Shift Parameter
-INCLUDE_SHIFT = False  # Global parameter for the shift in steering angle
+INCLUDE_SHIFT = True  # Global parameter for the shift in steering angle
 
 # *** environment parameters ***
 SPEED = 0.4
@@ -45,7 +47,7 @@ NOISE_SIGMA = 0.4
 
 SEQ_LEN = 10
 
-STEERING_SHIFT = -0.1
+STEERING_SHIFT = -0.001
 
 MODEL_SAVEFILE = "/tmp/actor_td3.pt"
 PRETRAINED_MODEL = sys.argv[1] if len(sys.argv) > 1 else None
@@ -141,7 +143,7 @@ if __name__ == "__main__":
         global noise, exploration_rate, INCLUDE_SHIFT
         with torch.no_grad():
             noise += NOISE_THETA * (NOISE_MEAN - noise) + NOISE_SIGMA * torch.randn(action_dim).to(device)  # Ornstein-Uhlenbeck process
-            action = (actor(feature_vec.unsqueeze(0), maneuver.unsqueeze(0))[0] + noise)
+            action = actor(feature_vec.unsqueeze(0), maneuver.unsqueeze(0))[0] + noise
             #print(f"Action: {action} before adding noise")
             if INCLUDE_SHIFT:
                 torch.add(action, STEERING_SHIFT, out=action)
@@ -157,12 +159,15 @@ if __name__ == "__main__":
 
     def save_weights(network, step, weight_history):
         weight_history[step] = {name: param.clone().cpu().detach().numpy() for name, param in network.named_parameters() if 'weight' in name}
+
+
     st, steps = time.perf_counter(), 0
     rews = []
     c1_loss, c2_loss, a_loss = [],[],[]
     outer_dist, dashed_dist, solid_dist  = [],[],[]
     feature_vec_queue = torch.zeros(SEQ_LEN+1, TinycarEncoder.FEATURE_VEC_SIZE).to(device)
     ctes = []
+    latent_space = []
     # Initialize a dictionary to store weights
     actor_weight_history = {}
     critic1_weight_history = {}
@@ -194,6 +199,10 @@ if __name__ == "__main__":
             solid_dist.append(info["laneline_distances"]["solid"])
             feature_vec_queue = torch.roll(feature_vec_queue, 1, 0)
             feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(obs)).to(device))
+
+            latent_space.append(get_feature_vec(torch.from_numpy(pre_obs(obs))).cpu().numpy())
+            #print(get_feature_vec(torch.from_numpy(pre_obs(obs))).cpu().numpy())
+
             replay_buffer.add(feature_vec_queue[1:,:].cpu().numpy(), maneuver, act, rew, feature_vec_queue[:-1,:].cpu().numpy())
             ep_rew += rew
             steps += 1
@@ -233,6 +242,22 @@ if __name__ == "__main__":
     plot_all_weight_changes("critic1",critic1_weight_changes,shift_suffix)
     plot_all_weight_changes("critic2",critic2_weight_changes,shift_suffix)
 
+    # Assuming latent_space is a list of latent vectors
+    latent_space_np = np.array(latent_space)
+
+    # t-SNE Transformation
+    tsne = TSNE(n_components=3, random_state=42)
+    latent_space_3d = tsne.fit_transform(latent_space_np)
+
+    # Plotting
+    fig = px.scatter_3d(
+        x=latent_space_3d[:, 0],
+        y=latent_space_3d[:, 1],
+        z=latent_space_3d[:, 2],
+        title='3D t-SNE Plot of Latent Space',
+        labels={'x': 't-SNE Component 1', 'y': 't-SNE Component 2', 'z': 't-SNE Component 3'}
+    )
+    fig.show()
 
 
     print("Evaluating:")
