@@ -20,4 +20,5 @@ def layout():
         os.path.join(base_path, 'actor_loss_with_shift'),
         os.path.join(base_path, 'rew_with_shift'),
         os.path.join(base_path, 'cte_with_shift'),
+        os.path.join(base_path, 'latent_space_visualization_with_shift')
     )

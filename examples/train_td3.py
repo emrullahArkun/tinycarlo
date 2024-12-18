@@ -1,42 +1,38 @@
 import gymnasium as gym
-import imageio.v2 as imageio
 import plotly.express as px
 from matplotlib import pyplot as plt
 from sklearn.manifold import TSNE
-
 import tinycarlo
 from typing import Tuple, List
 import torch
 import torch.nn.functional as F
-
 import os, sys
 import numpy as np
+import pandas as pd
 from tqdm import trange
 import time
-
 from examples.domain_randomization.vis_utils import create_distance_graph, create_cte_graph, calculate_weight_changes, \
-    plot_all_weight_changes
+    plot_all_weight_changes, save_to_csv
 from tinycarlo.wrapper.reward import CTELinearRewardWrapper, LanelineSparseRewardWrapper
 from tinycarlo.wrapper.termination import LanelineCrossingTerminationWrapper, CTETerminationWrapper, CrashTerminationWrapper
 from examples.models.tinycar_net import TinycarActorTemporal, TinycarCriticTemporal, TinycarCombo, TinycarEncoder
 from examples.benchmark_tinycar_net import pre_obs, evaluate
 from tinycarlo.helper import getenv
-from examples.rl_utils import avg_w, create_action_loss_graph, create_critic_loss_graph, create_ep_rew_graph, \
-    Replaybuffer, ReplaybufferTemporal
-
+from examples.rl_utils import avg_w, create_action_loss_graph, create_critic_loss_graph, create_ep_rew_graph, Replaybuffer, ReplaybufferTemporal
 # *** hyperparameters ***
 BATCH_SIZE = 256
 REPLAY_BUFFER_SIZE = 500_000
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 2e-4
-EPISODES = 100
+EPISODES = 2
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
 MAX_STEPS = 1000
 
 # Shift Parameter
-INCLUDE_SHIFT = True  # Global parameter for the shift in steering angle
+INCLUDE_SHIFT = False  # Global parameter for the shift in steering angle
+
 
 # *** environment parameters ***
 SPEED = 0.4
@@ -46,9 +42,7 @@ NOISE_MEAN = 0.0
 NOISE_SIGMA = 0.4
 
 SEQ_LEN = 10
-
-STEERING_SHIFT = -0.001
-
+STEERING_SHIFT = 1
 MODEL_SAVEFILE = "/tmp/actor_td3.pt"
 PRETRAINED_MODEL = sys.argv[1] if len(sys.argv) > 1 else None
 
@@ -144,11 +138,9 @@ if __name__ == "__main__":
         with torch.no_grad():
             noise += NOISE_THETA * (NOISE_MEAN - noise) + NOISE_SIGMA * torch.randn(action_dim).to(device)  # Ornstein-Uhlenbeck process
             action = actor(feature_vec.unsqueeze(0), maneuver.unsqueeze(0))[0] + noise
-            #print(f"Action: {action} before adding noise")
             if INCLUDE_SHIFT:
                 torch.add(action, STEERING_SHIFT, out=action)
             action = action.clamp(-1, 1).cpu()
-            #print(f"Action: {action} after adding noise")
         return action
     
     def get_feature_vec(obs: torch.Tensor) -> torch.Tensor:
@@ -168,6 +160,7 @@ if __name__ == "__main__":
     feature_vec_queue = torch.zeros(SEQ_LEN+1, TinycarEncoder.FEATURE_VEC_SIZE).to(device)
     ctes = []
     latent_space = []
+    latent_metadata = []
     # Initialize a dictionary to store weights
     actor_weight_history = {}
     critic1_weight_history = {}
@@ -200,8 +193,8 @@ if __name__ == "__main__":
             feature_vec_queue = torch.roll(feature_vec_queue, 1, 0)
             feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(obs)).to(device))
 
-            latent_space.append(get_feature_vec(torch.from_numpy(pre_obs(obs))).cpu().numpy())
-            #print(get_feature_vec(torch.from_numpy(pre_obs(obs))).cpu().numpy())
+            latent_space.append(feature_vec_queue[0].cpu().numpy())
+            latent_metadata.append((rew, info["cte"], maneuver))
 
             replay_buffer.add(feature_vec_queue[1:,:].cpu().numpy(), maneuver, act, rew, feature_vec_queue[:-1,:].cpu().numpy())
             ep_rew += rew
@@ -242,22 +235,13 @@ if __name__ == "__main__":
     plot_all_weight_changes("critic1",critic1_weight_changes,shift_suffix)
     plot_all_weight_changes("critic2",critic2_weight_changes,shift_suffix)
 
-    # Assuming latent_space is a list of latent vectors
+    # save the latent space to a CSV file for visualization
+    tsne = TSNE(n_components=2, random_state=42)
     latent_space_np = np.array(latent_space)
-
-    # t-SNE Transformation
-    tsne = TSNE(n_components=3, random_state=42)
-    latent_space_3d = tsne.fit_transform(latent_space_np)
-
-    # Plotting
-    fig = px.scatter_3d(
-        x=latent_space_3d[:, 0],
-        y=latent_space_3d[:, 1],
-        z=latent_space_3d[:, 2],
-        title='3D t-SNE Plot of Latent Space',
-        labels={'x': 't-SNE Component 1', 'y': 't-SNE Component 2', 'z': 't-SNE Component 3'}
-    )
-    fig.show()
+    latent_space_2d = tsne.fit_transform(latent_space_np)
+    rewards, ctes, maneuvers = zip(*latent_metadata)
+    save_to_csv(latent_space_2d, rewards, ctes, maneuvers, shift_suffix)
+    print("Saved CSV for Latent Space visualization.")
 
 
     print("Evaluating:")

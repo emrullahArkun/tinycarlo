@@ -17,7 +17,7 @@ pio.templates["custom_template"].layout.update(
 )
 
 # Apply the template to your figures
-def create_layout(title, outer_file, dashed_file, solid_file, actor_weight_file, critic1_weight_file, critic2_weight_file, critic_loss_file, actor_loss_file, ep_rew_file, cte_file):
+def create_layout(title, outer_file, dashed_file, solid_file, actor_weight_file, critic1_weight_file, critic2_weight_file, critic_loss_file, actor_loss_file, ep_rew_file, cte_file, latent_space):
     # Load the CSV files
     outer_df = pd.read_csv(outer_file)
     dashed_df = pd.read_csv(dashed_file)
@@ -68,8 +68,35 @@ def create_layout(title, outer_file, dashed_file, solid_file, actor_weight_file,
     critic1_weight_fig = px.line(critic1_weight_changes, x='Step', y='Mean Absolute Weight Change', color='Layer', title="Critic1 Weight Changes", template="custom_template", color_discrete_map=color_discrete_map)
     critic2_weight_fig = px.line(critic2_weight_changes, x='Step', y='Mean Absolute Weight Change', color='Layer', title="Critic2 Weight Changes", template="custom_template", color_discrete_map=color_discrete_map)
 
+    # Load the latent space CSV file
+    latent_df = pd.read_csv(latent_space)
+
+    # Plot 1: Reward-Visualisierung
+    reward_ls_fig = px.scatter(
+        latent_df, x="Dimension1", y="Dimension2", color="Reward",
+        title="Latent Space Visualization (Reward)",
+        template="custom_template",
+        color_continuous_scale="viridis", hover_data=["Reward", "CTE", "Maneuver"]
+    )
+
+    # Plot 2: CTE-Visualisierung
+    cte_ls_fig = px.scatter(
+        latent_df, x="Dimension1", y="Dimension2", color="CTE",
+        title="Latent Space Visualization (CTE)",
+        template="custom_template",
+        color_continuous_scale="rdbu", hover_data=["Reward", "CTE", "Maneuver"]
+    )
+
+    # Plot 3: Maneuver-Visualisierung
+    maneuver_ls_fig = px.scatter(
+        latent_df, x="Dimension1", y="Dimension2", color="Maneuver",
+        title="Latent Space Visualization (Maneuver)",
+        template="custom_template",
+        color_discrete_map={0: "red", 1: "green", 2: "blue"}, hover_data=["Reward", "CTE", "Maneuver"]
+    )
+
     # Adjust layout for the plots
-    for fig in [outer_fig, dashed_fig, solid_fig, critic_loss_fig, actor_loss_fig, ep_rew_fig, cte_fig, actor_weight_fig, critic1_weight_fig, critic2_weight_fig]:
+    for fig in [outer_fig, dashed_fig, solid_fig, critic_loss_fig, actor_loss_fig, ep_rew_fig, cte_fig, actor_weight_fig, critic1_weight_fig, critic2_weight_fig, reward_ls_fig, cte_ls_fig, maneuver_ls_fig]:
         fig.update_layout(
             autosize=False,
             width=500,
@@ -110,6 +137,11 @@ def create_layout(title, outer_file, dashed_file, solid_file, actor_weight_file,
             dcc.Graph(figure=solid_fig, style={"width": "500px", "height": "500px"})
         ], style={"display": "flex", "flex-direction": "row", "flex-wrap": "wrap"}),
         html.H3("Encoder"),
+        html.Div([
+            dcc.Graph(figure=reward_ls_fig, style={"width": "500px", "height": "500px"}),
+            dcc.Graph(figure=cte_ls_fig, style={"width": "500px", "height": "500px"}),
+            dcc.Graph(figure=maneuver_ls_fig, style={"width": "500px", "height": "500px"})
+        ], style={"display": "flex", "flex-direction": "row", "flex-wrap": "wrap"}),
         html.H3("RL-Netze"),
         html.Div([
             dcc.Graph(figure=actor_loss_fig, style={"width": "500px", "height": "500px"}),

@@ -1,14 +1,17 @@
 import csv
+import os
 from typing import List
-
-import imageio.v2 as imageio  # GIF direkt während der Laufzeit erstellen
 import numpy as np
 from matplotlib import pyplot as plt
+import pandas as pd
+import plotly.express as px
+from dash import dcc, html
 
 
 def create_distance_graph(laneline_distances: List[float], graph_name: str, shift_suffix: str):
     # CSV speichern
-    with open(f"domain_randomization/data/{graph_name}_{shift_suffix}", mode="w", newline="") as file:
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"./data/{graph_name}_{shift_suffix}")
+    with open(path, mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Step", "Distance"])  # Header
         for step, dist in enumerate(laneline_distances, start=1):
@@ -16,7 +19,8 @@ def create_distance_graph(laneline_distances: List[float], graph_name: str, shif
 
 def create_cte_graph(cte_values: List[float], graph_name: str, shift_suffix: str):
     # CSV speichern
-    with open(f"domain_randomization/data/{graph_name}_{shift_suffix}", mode="w", newline="") as file:
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"./data/{graph_name}_{shift_suffix}")
+    with open(path, mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Step", "CTE"])  # Header
         for step, cte in enumerate(cte_values, start=1):
@@ -36,9 +40,9 @@ def calculate_weight_changes(weight_history):
 
 def plot_all_weight_changes(network, weight_changes, shift_suffix):
     steps = sorted(weight_changes.keys())
-    csv_filename = f"domain_randomization/data/{network}_weight_changes_{shift_suffix}"
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"./data/{network}_weight_changes_{shift_suffix}")
 
-    with open(csv_filename, mode="w", newline="") as file:
+    with open(path, mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Step", "Layer", "Mean Absolute Weight Change"])  # Header
 
@@ -46,3 +50,14 @@ def plot_all_weight_changes(network, weight_changes, shift_suffix):
             for layer_name, changes in weight_changes[step].items():
                 mean_change = np.mean(changes)
                 writer.writerow([step, layer_name, mean_change])
+
+def save_to_csv(latent_space_2d, rewards, ctes, maneuvers, shift_suffix):
+    df = pd.DataFrame({
+        "Dimension1": latent_space_2d[:, 0],
+        "Dimension2": latent_space_2d[:, 1],
+        "Reward": rewards,
+        "CTE": ctes,
+        "Maneuver": maneuvers
+    })
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"./data/latent_space_visualization_{shift_suffix}")
+    df.to_csv(path, index=False)
