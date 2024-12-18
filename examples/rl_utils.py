@@ -1,4 +1,5 @@
 import csv
+import os
 from typing import List, Tuple
 import torch
 import torch.nn.functional as F
@@ -66,10 +67,10 @@ def create_critic_loss_graph(c1_loss: List[float], c2_loss: List[float], suffix:
     plt.xlabel("Step")
     plt.ylabel("Loss")
     plt.title("Critic Loss over Steps")
-    plt.savefig("/home/emrullah/Schreibtisch/critic_loss.png")  # Bild speichern
+    plt.savefig("/tmp/critic_loss.png")  # Bild speichern
 
     # CSV speichern
-    with open(f"domain_randomization/data/critic_loss_{suffix}", mode="w", newline="") as file:
+    with open(f"/tmp/critic_loss_{suffix}", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Step", "Critic 1 Loss", "Critic 2 Loss"])  # Header
         for step, (loss1, loss2) in enumerate(zip(c1_loss, c2_loss), start=1):
@@ -81,10 +82,10 @@ def create_action_loss_graph(a_loss: List[float], suffix: str):
     plt.plot(ma(a_loss))
     plt.xlabel("Step")
     plt.ylabel("Loss")
-    plt.savefig("/home/emrullah/Schreibtisch/actor_loss.png")
+    plt.savefig("/tmp/actor_loss.png")
 
     # CSV speichern
-    with open(f"domain_randomization/data/actor_loss_{suffix}", mode="w", newline="") as file:
+    with open(f"/tmp/actor_loss_{suffix}", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Step", "Loss"])  # Header
         for step, loss in enumerate(a_loss, start=1):
@@ -96,10 +97,10 @@ def create_ep_rew_graph(ep_rews: List[float], suffix: str):
     plt.plot(ma(ep_rews, 10))
     plt.xlabel("Episodes")
     plt.ylabel("Episodic Reward")
-    plt.savefig("/home/emrullah/Schreibtisch/ep_rew.png")
+    plt.savefig("/tmp/ep_rew.png")
 
     # CSV speichern
-    with open(f"domain_randomization/data/rew_{suffix}", mode="w", newline="") as file:
+    with open(f"/tmp/rew_{suffix}", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Episode", "Reward"])  # Header
         for episode, reward in enumerate(ep_rews, start=1):

@@ -10,8 +10,8 @@ from dash import dcc, html
 
 def create_distance_graph(laneline_distances: List[float], graph_name: str, shift_suffix: str):
     # CSV speichern
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"./data/{graph_name}_{shift_suffix}")
-    with open(path, mode="w", newline="") as file:
+    #path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"./data/{graph_name}_{shift_suffix}")
+    with open(f"/tmp/{graph_name}_{shift_suffix}", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Step", "Distance"])  # Header
         for step, dist in enumerate(laneline_distances, start=1):
@@ -19,8 +19,8 @@ def create_distance_graph(laneline_distances: List[float], graph_name: str, shif
 
 def create_cte_graph(cte_values: List[float], graph_name: str, shift_suffix: str):
     # CSV speichern
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"./data/{graph_name}_{shift_suffix}")
-    with open(path, mode="w", newline="") as file:
+    #path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"./data/{graph_name}_{shift_suffix}")
+    with open(f"/tmp/{graph_name}_{shift_suffix}", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Step", "CTE"])  # Header
         for step, cte in enumerate(cte_values, start=1):
@@ -42,7 +42,7 @@ def plot_all_weight_changes(network, weight_changes, shift_suffix):
     steps = sorted(weight_changes.keys())
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"./data/{network}_weight_changes_{shift_suffix}")
 
-    with open(path, mode="w", newline="") as file:
+    with open(f"/tmp/{network}_weight_changes_{shift_suffix}", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Step", "Layer", "Mean Absolute Weight Change"])  # Header
 
@@ -59,5 +59,5 @@ def save_to_csv(latent_space_2d, rewards, ctes, maneuvers, shift_suffix):
         "CTE": ctes,
         "Maneuver": maneuvers
     })
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"./data/latent_space_visualization_{shift_suffix}")
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"/tmp/latent_space_visualization_{shift_suffix}")
     df.to_csv(path, index=False)

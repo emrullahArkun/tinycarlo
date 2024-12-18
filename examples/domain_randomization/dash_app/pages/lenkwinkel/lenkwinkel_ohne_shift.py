@@ -6,7 +6,7 @@ from examples.domain_randomization.dash_app.pages.layout_utils import create_lay
 
 register_page(__name__, path="/lenkwinkel/ohne_shift")
 
-base_path = '../data'
+base_path = '/tmp'
 
 def layout():
     return create_layout(
