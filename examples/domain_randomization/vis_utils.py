@@ -44,20 +44,21 @@ def plot_all_weight_changes(network, weight_changes, shift_suffix):
 
     with open(f"/tmp/{network}_weight_changes_{shift_suffix}", mode="w", newline="") as file:
         writer = csv.writer(file)
-        writer.writerow(["Step", "Layer", "Mean Absolute Weight Change"])  # Header
+        writer.writerow(["Step", "Layer", "Absolute Weight Change"])  # Header
 
         for step in steps:
             for layer_name, changes in weight_changes[step].items():
                 mean_change = np.mean(changes)
                 writer.writerow([step, layer_name, mean_change])
 
-def save_to_csv(latent_space_2d, rewards, ctes, maneuvers, shift_suffix):
+def save_to_csv(latent_space_2d, rewards, ctes, maneuvers, heading_errors, shift_suffix):
     df = pd.DataFrame({
         "Dimension1": latent_space_2d[:, 0],
         "Dimension2": latent_space_2d[:, 1],
         "Reward": rewards,
         "CTE": ctes,
-        "Maneuver": maneuvers
+        "Maneuver": maneuvers,
+        "Heading Error": heading_errors
     })
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"/tmp/latent_space_visualization_{shift_suffix}")
     df.to_csv(path, index=False)

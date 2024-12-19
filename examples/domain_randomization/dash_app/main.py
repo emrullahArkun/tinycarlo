@@ -1,7 +1,6 @@
 from dash import Dash, dcc, html, Input, Output, State
 import dash
 import dash_bootstrap_components as dbc
-import subprocess
 
 # Use a Bootstrap theme
 app = Dash(__name__, use_pages=True, suppress_callback_exceptions=True, external_stylesheets=[dbc.themes.CYBORG])
@@ -15,9 +14,6 @@ app.layout = html.Div([
 
     # Placeholder for the shift dropdown
     html.Div(id="shift-dropdown", style={"position": "absolute", "top": "5px", "right": "5px"}),
-
-    # Button to start the training script
-    html.Button("Start Training", id="start-training-button", n_clicks=0),
 
     # Space for the content of the pages
     dash.page_container
@@ -80,18 +76,6 @@ def update_shift_dropdown(pathname):
             style={"border-radius": "20px", "padding": "10px 20px", "box-shadow": "0 4px 8px rgba(0, 0, 0, 0.1)"}
         )
     return None  # Keine Dropdowns für Home oder ungültige Pfade
-
-
-# Callback to start the training script
-@app.callback(
-    Output("start-training-button", "n_clicks"),
-    Input("start-training-button", "n_clicks")
-)
-def start_training(n_clicks):
-    if n_clicks > 0:
-        subprocess.Popen(["python", "/home/emrullah/Schreibtisch/tinycarlo/examples/train_td3.py"])
-
-    return 0  # Reset the button clicks
 
 
 if __name__ == "__main__":

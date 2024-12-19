@@ -24,7 +24,7 @@ BATCH_SIZE = 256
 REPLAY_BUFFER_SIZE = 500_000
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 2e-4
-EPISODES = 2
+EPISODES = 100
 DISCOUNT_FACTOR = 0.99
 TAU = 0.001  # soft update parameter
 POLICY_DELAY = 2  # Delayed policy updates
@@ -42,7 +42,7 @@ NOISE_MEAN = 0.0
 NOISE_SIGMA = 0.4
 
 SEQ_LEN = 10
-STEERING_SHIFT = 1
+STEERING_SHIFT = -0.2
 MODEL_SAVEFILE = "/tmp/actor_td3.pt"
 PRETRAINED_MODEL = sys.argv[1] if len(sys.argv) > 1 else None
 
@@ -194,7 +194,7 @@ if __name__ == "__main__":
             feature_vec_queue[0] = get_feature_vec(torch.from_numpy(pre_obs(obs)).to(device))
 
             latent_space.append(feature_vec_queue[0].cpu().numpy())
-            latent_metadata.append((rew, info["cte"], maneuver))
+            latent_metadata.append((rew, info["cte"], maneuver, info["heading_error"]))
 
             replay_buffer.add(feature_vec_queue[1:,:].cpu().numpy(), maneuver, act, rew, feature_vec_queue[:-1,:].cpu().numpy())
             ep_rew += rew
@@ -239,8 +239,8 @@ if __name__ == "__main__":
     tsne = TSNE(n_components=2, random_state=42)
     latent_space_np = np.array(latent_space)
     latent_space_2d = tsne.fit_transform(latent_space_np)
-    rewards, ctes, maneuvers = zip(*latent_metadata)
-    save_to_csv(latent_space_2d, rewards, ctes, maneuvers, shift_suffix)
+    rewards, ctes, maneuvers, heading_errors = zip(*latent_metadata)
+    save_to_csv(latent_space_2d, rewards, ctes, maneuvers, heading_errors, shift_suffix)
     print("Saved CSV for Latent Space visualization.")
 
 
